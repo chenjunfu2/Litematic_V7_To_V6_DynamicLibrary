@@ -1,0 +1,81 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.37027.11
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Litematic_V7_To_V6_DynamicLibrary", "Litematic_V7_To_V6_DynamicLibrary\Litematic_V7_To_V6_DynamicLibrary.vcxproj", "{4A05B117-BE7B-42EE-844A-098CB88EA6E7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencies", "{3B033E0D-6B77-48C7-A882-1A21CA2A5DF0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "nbt_cpp", "nbt_cpp", "{2C203D1A-2A7D-4FE6-862A-6FE87C7C152C}"
+	ProjectSection(SolutionItems) = preProject
+		Dependencies\nbt_cpp\Compiler_Define.h = Dependencies\nbt_cpp\Compiler_Define.h
+		Dependencies\nbt_cpp\MUTF8_Tool.hpp = Dependencies\nbt_cpp\MUTF8_Tool.hpp
+		Dependencies\nbt_cpp\NBT_All.hpp = Dependencies\nbt_cpp\NBT_All.hpp
+		Dependencies\nbt_cpp\NBT_Array.hpp = Dependencies\nbt_cpp\NBT_Array.hpp
+		Dependencies\nbt_cpp\NBT_Compound.hpp = Dependencies\nbt_cpp\NBT_Compound.hpp
+		Dependencies\nbt_cpp\NBT_Endian.hpp = Dependencies\nbt_cpp\NBT_Endian.hpp
+		Dependencies\nbt_cpp\NBT_Hash.hpp = Dependencies\nbt_cpp\NBT_Hash.hpp
+		Dependencies\nbt_cpp\NBT_Helper.hpp = Dependencies\nbt_cpp\NBT_Helper.hpp
+		Dependencies\nbt_cpp\NBT_IO.hpp = Dependencies\nbt_cpp\NBT_IO.hpp
+		Dependencies\nbt_cpp\NBT_List.hpp = Dependencies\nbt_cpp\NBT_List.hpp
+		Dependencies\nbt_cpp\NBT_Node.hpp = Dependencies\nbt_cpp\NBT_Node.hpp
+		Dependencies\nbt_cpp\NBT_Node_View.hpp = Dependencies\nbt_cpp\NBT_Node_View.hpp
+		Dependencies\nbt_cpp\NBT_Print.hpp = Dependencies\nbt_cpp\NBT_Print.hpp
+		Dependencies\nbt_cpp\NBT_Reader.hpp = Dependencies\nbt_cpp\NBT_Reader.hpp
+		Dependencies\nbt_cpp\NBT_Scanner.hpp = Dependencies\nbt_cpp\NBT_Scanner.hpp
+		Dependencies\nbt_cpp\NBT_String.hpp = Dependencies\nbt_cpp\NBT_String.hpp
+		Dependencies\nbt_cpp\NBT_TAG.hpp = Dependencies\nbt_cpp\NBT_TAG.hpp
+		Dependencies\nbt_cpp\NBT_Type.hpp = Dependencies\nbt_cpp\NBT_Type.hpp
+		Dependencies\nbt_cpp\NBT_Visitor.hpp = Dependencies\nbt_cpp\NBT_Visitor.hpp
+		Dependencies\nbt_cpp\NBT_Writer.hpp = Dependencies\nbt_cpp\NBT_Writer.hpp
+		Dependencies\nbt_cpp\vcpkg_config.h = Dependencies\nbt_cpp\vcpkg_config.h
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "util", "util", "{310EC3D5-2D07-4AE0-B438-D7F14A4AAAF2}"
+	ProjectSection(SolutionItems) = preProject
+		Dependencies\util\CodeTimer.hpp = Dependencies\util\CodeTimer.hpp
+		Dependencies\util\CPP_Helper.h = Dependencies\util\CPP_Helper.h
+		Dependencies\util\MyAssert.hpp = Dependencies\util\MyAssert.hpp
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Resources", "Resources", "{C68A336E-1E24-4A2D-B476-BACDFF02416D}"
+	ProjectSection(SolutionItems) = preProject
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		BasicConfiguration.props = BasicConfiguration.props
+		clang-format.txt = clang-format.txt
+		cmake-build.sh = cmake-build.sh
+		CMakeLists.txt = CMakeLists.txt
+		LibraryDependencies.props = LibraryDependencies.props
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Debug|x64.ActiveCfg = Debug|x64
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Debug|x64.Build.0 = Debug|x64
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Debug|x86.ActiveCfg = Debug|Win32
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Debug|x86.Build.0 = Debug|Win32
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Release|x64.ActiveCfg = Release|x64
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Release|x64.Build.0 = Release|x64
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Release|x86.ActiveCfg = Release|Win32
+		{4A05B117-BE7B-42EE-844A-098CB88EA6E7}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{2C203D1A-2A7D-4FE6-862A-6FE87C7C152C} = {3B033E0D-6B77-48C7-A882-1A21CA2A5DF0}
+		{310EC3D5-2D07-4AE0-B438-D7F14A4AAAF2} = {3B033E0D-6B77-48C7-A882-1A21CA2A5DF0}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9112989F-60AC-4234-B0FD-3D1E6A41A6DE}
+	EndGlobalSection
+EndGlobal
