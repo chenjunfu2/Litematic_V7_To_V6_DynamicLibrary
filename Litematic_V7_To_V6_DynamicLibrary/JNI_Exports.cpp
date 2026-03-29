@@ -1,7 +1,7 @@
 ﻿#include "Litematic_V7_To_V6.h"
 
 #include <stdint.h>
-#include "jni/include/jni.h"
+#include <jni.h>
 //#include "jni/include/dev_shun_litematica_extra_SchematicNativeReader.h"
 
 

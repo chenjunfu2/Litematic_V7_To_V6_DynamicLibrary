@@ -8,12 +8,18 @@ add_library(Litematic_V7_To_V6_DynamicLibrary SHARED
 )
 
 if(WIN32)
-    set(JVM_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/jni/lib/jvm.lib)
+    set(JAVA_JVM_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/jni/lib/jvm.lib)
+    set(JNI_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/jni/include)
 elseif(UNIX AND NOT APPLE)
-    set(JVM_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/jni/lib/libjvm.so)
+    find_package(JNI REQUIRED)
 endif()
+
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        ${JNI_INCLUDE_DIRS}
+)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        ${JVM_LIB_PATH}
+        ${JAVA_JVM_LIBRARY}
 )
