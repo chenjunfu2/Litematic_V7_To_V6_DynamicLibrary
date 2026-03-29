@@ -280,7 +280,7 @@ extern "C"
 			{
 				//转换数据
 				NBT_Type::Compound cpdV6Output{};
-				NBT_Type::Compound cpdV7Input = std::move(cpdV7Input);
+				NBT_Type::Compound cpdV7Input = std::move(cpdTmpV7Input);
 				if (!ConvertLitematicData_V7_To_V6(cpdV7Input, cpdV6Output))//从cpdV7Input转换到cpdV6Output
 				{
 					throw std::runtime_error("Unable to convert v7_data to v6_data!");
