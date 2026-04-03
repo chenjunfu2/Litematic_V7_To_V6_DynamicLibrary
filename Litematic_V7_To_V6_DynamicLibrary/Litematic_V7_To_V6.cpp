@@ -2,11 +2,10 @@
 
 #include "util/CodeTimer.hpp"
 
-#include <stdio.h>
 #include <stdint.h>
 #include <vector>
-#include <thread>
 #include <unordered_map>
+#include <stdexcept>
 
 #define V6_MINECRAFT_DATA_VERSION 3700
 #define V6_LITEMATIC_VERSION 6
@@ -25,7 +24,7 @@ std::string GenerateUniqueFilename(const std::string &sBeg, const std::string &s
 		}
 
 		//等几ms在继续
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		CodeTimer::Sleep(std::chrono::milliseconds(10));
 		--u32TryCount;
 	}
 
@@ -146,7 +145,7 @@ void ProcessTileEntity(NBT_Type::Compound &cpdV7TileEntityData, NBT_Type::Compou
 }
 
 //V7到V6仅转换Entity与TileEntity，其余不变
-bool ProcessRegion(NBT_Type::Compound &cpdV7RegionData, NBT_Type::Compound &cpdV6RegionData, const NBT_Type::Int iV7McDataVersion)
+void ProcessRegion(NBT_Type::Compound &cpdV7RegionData, NBT_Type::Compound &cpdV6RegionData, const NBT_Type::Int iV7McDataVersion)
 {
 	//先转移不变数据，然后处理实体与方块实体
 
@@ -167,14 +166,12 @@ bool ProcessRegion(NBT_Type::Compound &cpdV7RegionData, NBT_Type::Compound &cpdV
 	//这两个必须有，否则失败
 	if (!TransferDirectOptionalField(MU8STR("Position"), NBT_TAG::Compound))
 	{
-		printf("Position not found!\n");
-		return false;
+		throw std::runtime_error("Position not found!");
 	}
 
 	if (!TransferDirectOptionalField(MU8STR("Size"), NBT_TAG::Compound))
 	{
-		printf("Size not found!\n");
-		return false;
+		throw std::runtime_error("Size not found!");
 	}
 
 	//下面的可能没有，没有则跳过插入
@@ -218,19 +215,15 @@ bool ProcessRegion(NBT_Type::Compound &cpdV7RegionData, NBT_Type::Compound &cpdV
 			ProcessTileEntity(GetCompound(nodeTileEntity), cpdNode, iV7McDataVersion);
 		}
 	} while (false);
-
-
-	return true;
 }
 
 
-bool ConvertLitematicData_V7_To_V6(NBT_Type::Compound &cpdV7Input, NBT_Type::Compound &cpdV6Output)
+void ConvertLitematicData_V7_To_V6(NBT_Type::Compound &cpdV7Input, NBT_Type::Compound &cpdV6Output)
 {
 	auto *pRoot = cpdV7Input.HasCompound(MU8STR(""));
 	if (pRoot == NULL)
 	{
-		printf("Root Compound not found!\n");
-		return false;
+		throw std::runtime_error("Root Compound not found!");
 	}
 
 	//获取根部，并插入根部，最后获取根部引用
@@ -239,23 +232,20 @@ bool ConvertLitematicData_V7_To_V6(NBT_Type::Compound &cpdV7Input, NBT_Type::Com
 
 	//先处理版本信息
 	auto *pMinecraftDataVersion = cpdV7DataRoot.HasInt(MU8STR("MinecraftDataVersion"));
-	auto *pVersion = cpdV7DataRoot.HasInt(MU8STR("Version"));
+	//auto *pVersion = cpdV7DataRoot.HasInt(MU8STR("Version"));
 	//auto *pSubVersion = cpdV7DataRoot.HasInt(MU8STR("SubVersion"));
 
 	//版本验证
-	if ((pMinecraftDataVersion != NULL && *pMinecraftDataVersion <= V6_MINECRAFT_DATA_VERSION) ||
-		(pVersion != NULL && *pVersion <= V6_LITEMATIC_VERSION))
+	if (pMinecraftDataVersion == NULL || *pMinecraftDataVersion <= V6_MINECRAFT_DATA_VERSION)// || (pVersion != NULL && *pVersion <= V6_LITEMATIC_VERSION)//取消投影版本验证，仅验证mc数据版本
 	{
-		printf("Version Error!\n");
-		return false;
+		throw std::runtime_error("Minecraft Data Version Error!\n");
 	}
 
 	//基础数据
 	auto *pMetadata = cpdV7DataRoot.HasCompound(MU8STR("Metadata"));
 	if (pMetadata == NULL)
 	{
-		printf("Metadata not found!\n");
-		return false;
+		throw std::runtime_error("Metadata not found!\n");
 	}
 
 	//直接转移所有权，消除拷贝
@@ -270,8 +260,7 @@ bool ConvertLitematicData_V7_To_V6(NBT_Type::Compound &cpdV7Input, NBT_Type::Com
 	auto *pRegions = cpdV7DataRoot.HasCompound(MU8STR("Regions"));
 	if (pRegions == NULL)
 	{
-		printf("Regions not found!\n");
-		return false;
+		throw std::runtime_error("Regions not found!\n");
 	}
 
 	//插入选区根
@@ -281,97 +270,13 @@ bool ConvertLitematicData_V7_To_V6(NBT_Type::Compound &cpdV7Input, NBT_Type::Com
 	for (auto &[sV7RegionName, nodeV7RegionData] : *pRegions)
 	{
 		auto &cpdNewV6RegionData = cpdV6Regions.PutCompound(sV7RegionName, {}).first->second.GetCompound();
-		if (!ProcessRegion(GetCompound(nodeV7RegionData), cpdNewV6RegionData, *pMinecraftDataVersion))
+		try
 		{
-			printf("ProcessRegion fail!\n");
-			return false;
+			ProcessRegion(GetCompound(nodeV7RegionData), cpdNewV6RegionData, *pMinecraftDataVersion);
+		}
+		catch (const std::exception &e)
+		{
+			throw std::runtime_error(std::string(e.what()) += "\nProcessRegion fail!");
 		}
 	}
-
-	return true;
 }
-
-//bool ConvertLitematicFile_V7_To_V6(const std::string &sV7FilePath)
-//{
-//	NBT_Type::Compound cpdV7Input{};
-//	NBT_Type::Compound cpdV6Output{};
-//
-//	//从sV7FilePath读取到cpdV7Input
-//	{
-//		std::vector<uint8_t> vFileV7Stream{};
-//		if (!NBT_IO::ReadFile(sV7FilePath, vFileV7Stream))
-//		{
-//			printf("Unable to read stream from file!\n");
-//			return false;
-//		}
-//
-//		//如果解压失败那么可能原先文件未压缩
-//		std::vector<uint8_t> vDataV7Stream{};
-//		if (!NBT_IO::DecompressDataNoThrow(vDataV7Stream, vFileV7Stream))
-//		{
-//			printf("Data may not be compressed, attempt to parse directly.\n");
-//			vDataV7Stream = std::move(vFileV7Stream);//尝试以未压缩流处理，而不是失败
-//		}
-//
-//		if (!NBT_Reader::ReadNBT(vDataV7Stream, 0, cpdV7Input))
-//		{
-//			printf("Unable to parse data from stream!\n");
-//			return false;
-//		}
-//	}
-//
-//	//从cpdV7Input转换到cpdV6Output
-//	if (!ConvertLitematicData_V7_To_V6(cpdV7Input, cpdV6Output))
-//	{
-//		printf("Unable to convert v7_data to v6_data!\n");
-//		return false;
-//	}
-//
-//	//写出cpdV6Output到文件sV6FilePath
-//	{
-//		std::vector<uint8_t> vDataV6Stream{};
-//		if (!NBT_Writer::WriteNBT(vDataV6Stream, 0, cpdV6Output))
-//		{
-//			printf("Unable to write data into stream!\n");
-//			return false;
-//		}
-//
-//		//查找合法文件
-//		std::string sV6FilePath{};
-//		{
-//			//找到后缀名
-//			size_t szPos = sV7FilePath.find_last_of('.');
-//
-//			//'.'前面的部分，不包含'.'
-//			std::string sV7FileName = sV7FilePath.substr(0, szPos).append("_V6_");
-//			//'.'后面的部分，包含'.'
-//			std::string sV7FileExten = sV7FilePath.substr(szPos);
-//
-//			//唯一文件名
-//			sV6FilePath = GenerateUniqueFilename(sV7FileName, sV7FileExten);
-//			if (sV6FilePath.empty())
-//			{
-//				printf("Unable to find a valid file name or lack of permission!\n");
-//				return false;
-//			}
-//		}
-//
-//		//压缩数据
-//		std::vector<uint8_t> vFileV6Stream{};
-//		if (!NBT_IO::CompressDataNoThrow(vFileV6Stream, vDataV6Stream))
-//		{
-//			printf("Unable to compress data stream!\n");
-//			return false;
-//		}
-//
-//		//写入数据
-//		if (!NBT_IO::WriteFile(sV6FilePath, vFileV6Stream))
-//		{
-//			printf("Unable to write stream into file!\n");
-//			return false;
-//		}
-//	}
-//
-//	printf("Convert Success!\n");
-//	return true;
-//}
