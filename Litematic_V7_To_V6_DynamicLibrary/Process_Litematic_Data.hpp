@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "nbt_cpp/NBT_All.hpp"
+#include <nbt_cpp/NBT_All.hpp>
 
 #include <vector>
 #include <unordered_map>
