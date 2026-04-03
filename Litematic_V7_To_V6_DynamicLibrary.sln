@@ -44,6 +44,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Resources", "Resources", "{
 		.gitattributes = .gitattributes
 		.gitignore = .gitignore
 		BasicConfiguration.props = BasicConfiguration.props
+		.github\workflows\c-cpp.yml = .github\workflows\c-cpp.yml
 		clang-format.txt = clang-format.txt
 		cmake-build.sh = cmake-build.sh
 		CMakeLists.txt = CMakeLists.txt
