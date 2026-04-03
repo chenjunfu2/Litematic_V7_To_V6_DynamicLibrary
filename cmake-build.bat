@@ -21,7 +21,7 @@ if exist build (
 
 echo.
 echo [2/3] Configuring CMake
-cmake -B build -DCMAKE_BUILD_TYPE=Release -S .
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g0" -S .
 if %errorlevel% neq 0 (
     echo.
     echo [Error] CMake configuration failed!
