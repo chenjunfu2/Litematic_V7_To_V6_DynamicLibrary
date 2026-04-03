@@ -7,7 +7,7 @@
 /// @note 如果用户通过vcpkg安装此库，则请不要修改安装目录下的此文件，vcpkg会自动根据可选库生成具体内容
 
 //use zlib
-#define CJF2_NBT_CPP_USE_ZLIB ///< 安装zlib库则定义，否则请注释
+//#define CJF2_NBT_CPP_USE_ZLIB ///< 安装zlib库则定义，否则请注释
 
 //use xxhash
-#define CJF2_NBT_CPP_USE_XXHASH ///< 安装xxhash库则定义，否则请注释
+//#define CJF2_NBT_CPP_USE_XXHASH ///< 安装xxhash库则定义，否则请注释
