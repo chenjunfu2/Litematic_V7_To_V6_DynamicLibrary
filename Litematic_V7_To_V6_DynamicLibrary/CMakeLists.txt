@@ -11,6 +11,8 @@ set_target_properties(Litematic_V7_To_V6_DynamicLibrary PROPERTIES
     PREFIX ""
 )
 
+set_release_static_link(Litematic_V7_To_V6_DynamicLibrary)
+
 if(WIN32)
     set(JAVA_JVM_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/jni/lib/jvm.lib)
     set(JNI_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/jni/include)
