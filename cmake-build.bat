@@ -5,3 +5,6 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 
 cmake --build build
 if %errorlevel% neq 0 exit /b %errorlevel%
+
+strip --strip-all ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dll
+if %errorlevel% neq 0 exit /b %errorlevel%

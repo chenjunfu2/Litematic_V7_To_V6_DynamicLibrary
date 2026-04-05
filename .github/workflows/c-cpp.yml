@@ -34,11 +34,8 @@ jobs:
     - name: List Dir
       run: find . -type f | sort
       
-    - name: Configure with CMake
-      run: cmake -B build -S .
-      
-    - name: Build
-      run: cmake --build build
+    - name: Run Script
+      run: sh ./cmake-build.sh
       
     - name: List Dir
       run: find . -type f | sort
