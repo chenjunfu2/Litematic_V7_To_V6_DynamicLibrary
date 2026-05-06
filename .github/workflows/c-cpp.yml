@@ -26,13 +26,13 @@ jobs:
 
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows' && matrix.target == 'native'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@v6
         with:
           arch: x64
 
       - name: Setup GCC (Linux)
         if: runner.os == 'Linux' && matrix.target == 'native'
-        uses: egor-tensin/setup-gcc@v1
+        uses: egor-tensin/setup-gcc@v6
         with:
           version: latest
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: Setup Android NDK (Linux)
         if: runner.os == 'Linux' && matrix.target == 'android'
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v6
         with:
           ndk-version: r26d
 
