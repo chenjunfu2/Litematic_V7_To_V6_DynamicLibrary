@@ -39,7 +39,7 @@ jobs:
       - name: List Dir (Windows)
         if: runner.os == 'Windows'
         run: |
-          Get-ChildItem -Recurse -File | Select-Object FullName | Sort-Object FullName
+          (Get-ChildItem -Recurse -File).FullName | Sort-Object
         shell: pwsh
 
       # Upload
@@ -49,7 +49,7 @@ jobs:
           name: ${{ runner.os }}-artifacts
           path: |
             ${{ 
-              runner.os == 'Windows' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dll' || 
+              runner.os == 'Windows' && './build/Litematic_V7_To_V6_DynamicLibrary/x64/Release/Litematic_V7_To_V6_DynamicLibrary.dll' || 
               runner.os == 'Linux' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so' || 
               runner.os == 'macOS' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib'
             }}
