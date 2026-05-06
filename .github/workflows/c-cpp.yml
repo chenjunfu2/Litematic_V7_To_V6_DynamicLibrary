@@ -32,6 +32,16 @@ jobs:
           ./cmake-build.sh
         shell: bash
 
+      - name: List Dir (Unix)
+        if: runner.os != 'Windows'
+        run: find . -type f | sort
+
+      - name: List Dir (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Get-ChildItem -Recurse -File | Select-Object FullName | Sort-Object FullName
+        shell: pwsh
+
       # Upload
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
