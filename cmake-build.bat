@@ -1,10 +1,8 @@
 @echo off
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG -g0" -S .
-if %errorlevel% neq 0 exit /b %errorlevel%
+set SLN_FILE=Litematic_V7_To_V6_DynamicLibrary.sln
+set CONFIG=Release
+set PLATFORM=x64
 
-cmake --build build
-if %errorlevel% neq 0 exit /b %errorlevel%
-
-strip --strip-all ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dll
+msbuild %SLN_FILE% /p:Configuration=%CONFIG% /p:Platform=%PLATFORM% /p:PlatformToolset=v142 /m
 if %errorlevel% neq 0 exit /b %errorlevel%
