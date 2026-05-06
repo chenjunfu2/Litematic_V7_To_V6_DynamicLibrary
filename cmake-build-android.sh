@@ -16,3 +16,6 @@ cmake -B build-android \
 cmake --build build-android --config "$BUILD_TYPE" -j $(nproc)
 
 $ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip --strip-all ./build-android/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so
+
+mkdir -p artifacts/android-arm64
+cp -f ./build-android/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so artifacts/android-arm64/
