@@ -21,15 +21,15 @@ jobs:
       # Windows: MSVC (MSBuild)
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: build.bat
+        run: cmake-build.bat
         shell: cmd
 
       # Linux: GCC / macOS: Clang
       - name: Build (Unix)
         if: runner.os != 'Windows'
         run: |
-          chmod +x build.sh
-          ./build.sh
+          chmod +x cmake-build.sh
+          ./cmake-build.sh
         shell: bash
 
       # Upload
