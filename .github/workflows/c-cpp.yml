@@ -25,25 +25,25 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.target == 'native'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: Setup GCC (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.target == 'native'
         uses: egor-tensin/setup-gcc@v1
         with:
           version: latest
 
       - name: Setup Clang (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && matrix.target == 'native'
         run: |
           brew install llvm
           echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
         shell: bash
 
-      - name: Setup Android NDK
+      - name: Setup Android NDK (Linux)
         if: runner.os == 'Linux' && matrix.target == 'android'
         uses: nttld/setup-ndk@v1
         with:
@@ -51,20 +51,33 @@ jobs:
 
       # Windows: MSVC (MSBuild)
       - name: Build (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.target == 'native'
         run: cmake-build.bat
         shell: cmd
 
-      # Linux: GCC / macOS: Clang
-      - name: Build (Unix)
-        if: runner.os != 'Windows' && matrix.target == 'native'
+      # Linux: GCC
+      - name: Build (Linux)
+        if: runner.os == 'Linux' && matrix.target == 'native'
         run: |
-          chmod +x cmake-build.sh
-          ./cmake-build.sh
+          chmod +x cmake-build-linux.sh
+          ./cmake-build-linux.sh
         shell: bash
 
-      #build Android
-        
+      # macOS: Clang
+      - name: Build (macOS)
+        if: runner.os == 'macOS' && matrix.target == 'native'
+        run: |
+          chmod +x cmake-build-macos.sh
+          ./cmake-build-macos.sh
+        shell: bash
+
+      # Android: Linux Android NDK
+      - name: Build for Android
+        if: runner.os == 'Linux' && matrix.target == 'android'
+        run: |
+          chmod +x cmake-build-android.sh
+          ./build-android.sh
+        shell: bash
 
       - name: List Dir (Unix)
         if: runner.os != 'Windows'
@@ -80,7 +93,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ runner.os }}-artifacts
+          name: ${{ runner.os }}-${{matrix.target}}-artifacts
           path: |
             ${{ 
               runner.os == 'Windows' && './x64/Release/Litematic_V7_To_V6_DynamicLibrary.dll' || 
