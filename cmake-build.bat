@@ -4,7 +4,8 @@ set SLN_FILE=Litematic_V7_To_V6_DynamicLibrary.sln
 set CONFIG=Release
 set PLATFORM=x64
 
-for /f "delims=" %%i in ('"%VSWHERE%" -latest -requires Microsoft.Component.MSBuild -find MSBuild\Current\Bin\MSBuild.exe') do (
+set "MSBUILD_PATH="
+for /f "delims=" %%i in ('vswhere -latest -requires Microsoft.Component.MSBuild -find MSBuild\Current\Bin\MSBuild.exe') do (
     set "MSBUILD_PATH=%%i"
 )
 
