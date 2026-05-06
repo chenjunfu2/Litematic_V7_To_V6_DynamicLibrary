@@ -18,18 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup compiler environment
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            MSBUILD_PATH=$(vswhere -latest -requires Microsoft.Component.MSBuild -find MSBuild/Current/Bin/MSBuild.exe | head -1)
-            if [ -n "$MSBUILD_PATH" ]; then
-              MSBUILD_DIR=$(dirname "$MSBUILD_PATH")
-            else
-              exit 1
-            fi
-          fi
-        shell: bash
-
       # Windows: MSVC (MSBuild)
       - name: Build (Windows)
         if: runner.os == 'Windows'
