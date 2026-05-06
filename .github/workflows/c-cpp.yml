@@ -76,7 +76,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.target == 'android'
         run: |
           chmod +x cmake-build-android.sh
-          ./build-android.sh
+          ./cmake-build-android.sh
         shell: bash
 
       - name: List Dir (Unix)
