@@ -89,15 +89,9 @@ jobs:
           (Get-ChildItem -Recurse -File).FullName | Sort-Object
         shell: pwsh
 
-      # Upload
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ runner.os }}-${{matrix.target}}-artifacts
-          path: |
-            ${{ 
-              runner.os == 'Windows' && './x64/Release/Litematic_V7_To_V6_DynamicLibrary.dll' || 
-              runner.os == 'Linux' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so' || 
-              runner.os == 'macOS' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib'
-            }}
+          name: all-artifacts
+          path: artifacts/
           if-no-files-found: error
