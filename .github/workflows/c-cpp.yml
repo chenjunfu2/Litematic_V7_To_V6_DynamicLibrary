@@ -2,81 +2,43 @@ name: C/C++ CI
 
 on:
   workflow_dispatch:
-  #push:
-  #  branches: [ "master" ]
-  #pull_request:
-  #  branches: [ "master" ]
+  # push:
+  #   branches: [ "master" ]
+  # pull_request:
+  #   branches: [ "master" ]
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        compiler: [gcc, clang]
+        os: [windows-latest, ubuntu-latest, macos-latest]
       fail-fast: false
 
-    runs-on: ${{ matrix.os }}
-      
     steps:
-    - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-    - name: Setup GCC (Linux)
-      if: runner.os == 'Linux' && matrix.compiler == 'gcc'
-      uses: egor-tensin/setup-gcc@v1
-      with:
-        version: latest
+      # Windows: 使用 MSVC (MSBuild)
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: build.bat
+        shell: cmd
 
-    - name: Setup Clang (Linux)
-      if: runner.os == 'Linux' && matrix.compiler == 'clang'
-      uses: egor-tensin/setup-clang@v1
-      with:
-        version: latest
+      # Linux (GCC) / macOS (Clang)
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x build.sh
+          ./build.sh
+        shell: bash
 
-    - name: Setup GCC (Windows)
-      if: runner.os == 'Windows' && matrix.compiler == 'gcc'
-      uses: egor-tensin/setup-mingw@v1
-      with:
-        version: latest
-
-    - name: Setup Clang (Windows)
-      if: runner.os == 'Windows' && matrix.compiler == 'clang'
-      uses: egor-tensin/setup-clang@v1
-      with:
-        version: latest
-
-
-    - name: Setup Clang (macOS)
-      if: runner.os == 'macOS' && matrix.compiler == 'clang'
-      run: |
-        echo "CC=clang" >> $GITHUB_ENV
-        echo "CXX=clang++" >> $GITHUB_ENV
-
-    - name: Setup GCC (macOS)
-      if: runner.os == 'macOS' && matrix.compiler == 'gcc'
-      run: |
-        brew install gcc
-        brew link --overwrite gcc
-        echo "CC=gcc" >> $GITHUB_ENV
-        echo "CXX=g++" >> $GITHUB_ENV
-
-    - name: Build (Unix)
-      if: runner.os != 'Windows'
-      run: |
-        chmod +x cmake-build.sh
-        ./cmake-build.sh
-      shell: bash
-
-    - name: Build (Windows)
-      if: runner.os == 'Windows'
-      run: cmake-build.bat
-      shell: cmd
-    
-    - name: List Dir (Unix)
-      if: runner.os != 'Windows'
-      run: find . -type f | sort
-      shell: bash
-
-    - name: List Dir (Windows)
-      if: runner.os == 'Windows'
-      run: Get-ChildItem -Recurse | Select-Object FullName | Sort-Object FullName
-      shell: pwsh
+      # 上传编译产物
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifacts
+          path: |
+            build/*.dll
+            build/*.so
+            build/*.dylib
+          if-no-files-found: error
