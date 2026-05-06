@@ -18,13 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Windows: 使用 MSVC (MSBuild)
+      # Windows: MSVC (MSBuild)
       - name: Build (Windows)
         if: runner.os == 'Windows'
         run: build.bat
         shell: cmd
 
-      # Linux (GCC) / macOS (Clang)
+      # Linux: GCC / macOS: Clang
       - name: Build (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -32,7 +32,7 @@ jobs:
           ./build.sh
         shell: bash
 
-      # 上传编译产物
+      # Upload
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
