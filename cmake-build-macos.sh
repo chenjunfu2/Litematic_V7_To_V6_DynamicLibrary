@@ -6,5 +6,5 @@ cmake --build build
 
 strip -Sx ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib
 
-mkdir -p artifacts/macos-native-x64
-cp -f ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib artifacts/macos-native-x64/
+mkdir -p artifacts/macos-x64
+cp -f ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib artifacts/macos-x64/
