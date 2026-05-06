@@ -38,7 +38,9 @@ jobs:
         with:
           name: ${{ runner.os }}-artifacts
           path: |
-            build/*.dll
-            build/*.so
-            build/*.dylib
+            ${{ 
+              runner.os == 'Windows' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dll' || 
+              runner.os == 'Linux' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so' || 
+              runner.os == 'macOS' && './build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.dylib'
+            }}
           if-no-files-found: error
