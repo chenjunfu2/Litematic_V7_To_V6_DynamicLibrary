@@ -14,6 +14,9 @@ if not defined MSBUILD (
 )
 echo MSBuild path "%MSBUILD%"
 
+for /f "usebackq delims=" %i in (`"!VSWHERE!" -latest -find **\devenv.com`) do "%i" Litematic_V7_To_V6_DynamicLibrary.sln /Upgrade
+del /Q UpgradeLog*.htm 2>nul
+
 "%MSBUILD%" Litematic_V7_To_V6_DynamicLibrary.sln /p:Configuration=Release /p:Platform=x64 /m
 if %errorlevel% neq 0 exit /b %errorlevel%
 
