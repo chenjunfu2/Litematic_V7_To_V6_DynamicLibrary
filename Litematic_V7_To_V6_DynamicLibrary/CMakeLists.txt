@@ -7,9 +7,11 @@ add_library(Litematic_V7_To_V6_DynamicLibrary SHARED
     Litematic_V7_To_V6.cpp
 )
 
-set_target_properties(Litematic_V7_To_V6_DynamicLibrary PROPERTIES
-    PREFIX ""
-)
+if(WIN32)
+    set_target_properties(Litematic_V7_To_V6_DynamicLibrary PROPERTIES
+        PREFIX ""
+    )
+endif()
 
 set_release_static_link(Litematic_V7_To_V6_DynamicLibrary)
 

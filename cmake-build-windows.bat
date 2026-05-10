@@ -1,6 +1,20 @@
 @echo off
+setlocal enabledelayedexpansion
 
-msbuild Litematic_V7_To_V6_DynamicLibrary.sln /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v142 /m
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "!VSWHERE!" (
+    echo Error: vswhere.exe not found. Please install Visual Studio or add msbuild to PATH.
+    exit /b 1
+)
+
+for /f "usebackq delims=" %%i in (`"!VSWHERE!" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe`) do set "MSBUILD=%%i"
+if not defined MSBUILD (
+    echo Error: No MSBuild found by vswhere.
+    exit /b 1
+)
+echo MSBuild path "%MSBUILD%"
+
+"%MSBUILD%" Litematic_V7_To_V6_DynamicLibrary.sln /p:Configuration=Release /p:Platform=x64 /m
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 mkdir .\artifacts\windows-x64
