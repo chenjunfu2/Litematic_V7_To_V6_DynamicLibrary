@@ -7,4 +7,4 @@ cmake --build build
 strip --strip-all ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so
 
 mkdir -p artifacts/linux-x64
-cp -f ./build/Litematic_V7_To_V6_DynamicLibrary/Litematic_V7_To_V6_DynamicLibrary.so artifacts/linux-x64/
+cp -f ./build/Litematic_V7_To_V6_DynamicLibrary/libLitematic_V7_To_V6_DynamicLibrary.so artifacts/linux-x64/
