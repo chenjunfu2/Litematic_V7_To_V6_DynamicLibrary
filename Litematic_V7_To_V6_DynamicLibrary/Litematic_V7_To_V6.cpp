@@ -1,7 +1,5 @@
 ﻿#include "Process_Litematic_Data.hpp"
 
-#include "util/CodeTimer.hpp"
-
 #include <stdint.h>
 #include <vector>
 #include <unordered_map>
@@ -10,28 +8,6 @@
 #define V6_MINECRAFT_DATA_VERSION 3700
 #define V6_LITEMATIC_VERSION 6
 #define V6_LITEMATIC_SUBVERSION 1
-
-//找到一个唯一文件名
-std::string GenerateUniqueFilename(const std::string &sBeg, const std::string &sEnd, uint32_t u32TryCount = 10)//默认最多重试10次
-{
-	while (u32TryCount != 0)
-	{
-		//时间用[]包围
-		auto tmpPath = std::format("{}[{}]{}", sBeg, CodeTimer::GetSystemTime(), sEnd);//获取当前系统时间戳作为中间的部分
-		if (!NBT_IO::IsFileExist(tmpPath))
-		{
-			return tmpPath;
-		}
-
-		//等几ms在继续
-		CodeTimer::Sleep(std::chrono::milliseconds(10));
-		--u32TryCount;
-	}
-
-	//次数到上限直接返回空
-	return std::string{};
-}
-
 
 void ProcessEntity(NBT_Type::Compound &cpdV7EntityData, NBT_Type::Compound &cpdV6EntityData, const NBT_Type::Int iV7McDataVersion)
 {

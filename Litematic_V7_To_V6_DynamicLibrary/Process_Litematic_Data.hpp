@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <nbt_cpp/NBT_All.hpp>
+#include "nbt_cpp/NBT_All.hpp"
 
 #include <vector>
 #include <unordered_map>
@@ -117,12 +117,7 @@ void FixTileEntityId(NBT_Type::Compound &cpdTileEntity, const NBT_Type::Int iV7M
 			continue;
 		}
 
-		//附条件匹配，如果附条件为空，则跳过
-		if (listAdditional.empty())
-		{
-			continue;
-		}
-
+		//附条件匹配，如果附条件为空，则默认匹配成功
 		for (const auto &itAdd : listAdditional)
 		{
 			if (!cpdTileEntity.Contains(itAdd))
@@ -704,7 +699,7 @@ void ProcessDyedColor(NBT_Node &nodeV7Tag, NBT_Node &nodeV6Tag, const NBT_Type::
 			(uint32_t)255 << 24 |
 			(uint32_t)bR  << 16 |
 			(uint32_t)bG  <<  8 |
-			(uint32_t)bR  <<  0;
+			(uint32_t)bB  <<  0;
 
 		nodeV6Tag.SetInt(iRGB);
 	}
@@ -1039,7 +1034,7 @@ void ProcessComponentsTag(NBT_Type::Compound &cpdV7Tag, const NBT_Type::String &
 		MapValFunc_T funcProcess;
 	};
 
-	const static std::unordered_map<NBT_Type::String, MapVal_T> mapProccess =
+	const static std::unordered_map<NBT_Type::String, MapVal_T> mapProcess =
 	{
 		{ MU8STR("minecraft:block_state"),				{ false,	UseTagType::V6Tag,			std::bind(RenameProcess,	MU8STR("BlockStateTag"),		_1, _2, _3, _4) } },
 		{ MU8STR("minecraft:instrument"),				{ false,	UseTagType::V6Tag,			std::bind(RenameProcess,	MU8STR("instrument"),			_1, _2, _3, _4) } },
@@ -1124,7 +1119,7 @@ void ProcessComponentsTag(NBT_Type::Compound &cpdV7Tag, const NBT_Type::String &
 					DefaultProcess(MU8STR("Items"), ProcessItemsNested, MU8STR(""), nodeV7TagVal, cpdV6TagData, iV7McDataVersion);
 				}
 
-				bool bShulker = strItemId.find(MU8STR("shulker")) == strItemId.npos;
+				bool bShulker = strItemId.find(MU8STR("shulker")) != strItemId.npos;
 				cpdV6TagData.PutString(MU8STR("id"), bShulker ? MU8STR("minecraft:shulker_box") : strItemId);
 			}}
 		},
@@ -1157,8 +1152,8 @@ void ProcessComponentsTag(NBT_Type::Compound &cpdV7Tag, const NBT_Type::String &
 	for (auto &[strV7Key, strV7Val] : cpdV7Tag)
 	{
 		//查找是否有匹配的处理过程
-		auto itFind = mapProccess.find(strV7Key);
-		if (itFind == mapProccess.end())
+		auto itFind = mapProcess.find(strV7Key);
+		if (itFind == mapProcess.end())
 		{
 			//不匹配直接移动处理
 			cpdV6Tag.Put(strV7Key, std::move(strV7Val));
