@@ -29,7 +29,7 @@ jobs:
           - os: linux
             target: native
             arch: arm64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04-arm
           - os: linux
             target: android
             arch: x64
@@ -45,48 +45,42 @@ jobs:
           - os: macos
             target: native
             arch: x64
-            runner: macos-latest-large
+            runner: macos-13
 
     steps:
       - uses: actions/checkout@v6
 
-      # Windows
+      # Setup Windows
       - name: Setup MSVC (Windows native x64)
         if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'x64'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      # Windows
+      # Setup Windows
       - name: Setup MSVC (Windows native arm64)
         if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'arm64'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
 
-      # Linux
-      - name: Setup GCC (Linux native x64)
-        if: runner.os == 'Linux' && matrix.target == 'native' && matrix.arch == 'x64'
-        uses: egor-tensin/setup-gcc@v2
+      # Setup Linux
+      - name: Setup GCC (Linux native x64 & arm64)
+        if: runner.os == 'Linux' && matrix.target == 'native'
+        uses: aminya/setup-cpp@v1
         with:
-          version: latest
-          platform: x64
+          compiler: gcc
+          cmake: true
 
-      # Linux
-      - name: Setup GCC (Linux native arm64)
-        if: runner.os == 'Linux' && matrix.target == 'native' && matrix.arch == 'arm64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-      # macOS
+      # Setup macOS
       - name: Setup Clang (macOS native x64 & arm64)
         if: runner.os == 'macOS' && matrix.target == 'native'
-        run: |
-          echo "Using Xcode default toolchain"
-          clang --version
+        uses: aminya/setup-cpp@v1
+        with:
+            compiler: apple-clang
+            cmake: true
 
-      # Android
+      # Setup Android
       - name: Setup Android NDK (Linux android x64 & arm64)
         if: runner.os == 'Linux' && matrix.target == 'android'
         uses: nttld/setup-ndk@v1
