@@ -18,10 +18,10 @@ jobs:
             target: native
             arch: x64
             runner: windows-latest
-          - os: windows
-            target: native
-            arch: arm64
-            runner: windows-latest
+          #- os: windows
+          #  target: native
+          #  arch: arm64
+          #  runner: windows-latest
           - os: linux
             target: native
             arch: x64
@@ -45,24 +45,17 @@ jobs:
           - os: macos
             target: native
             arch: x64
-            runner: macos-13
+            runner: macos-latest
 
     steps:
       - uses: actions/checkout@v6
 
       # Setup Windows
-      - name: Setup MSVC (Windows native x64)
-        if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'x64'
+      - name: Setup MSVC (Windows native x64 & arm64)
+        if: runner.os == 'Windows' && matrix.target == 'native'
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          arch: x64
-
-      # Setup Windows
-      - name: Setup MSVC (Windows native arm64)
-        if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'arm64'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64_arm64
+          arch: ${{ matrix.arch == 'x64' && 'x64' || 'amd64_arm64' }}
 
       # Setup Linux
       - name: Setup GCC (Linux native x64 & arm64)
@@ -87,13 +80,13 @@ jobs:
         with:
           ndk-version: r26d
 
-      # Windows: MSVC (MSBuild)
+      # Build Windows: MSVC (MSBuild)
       - name: Build (Windows)
         if: runner.os == 'Windows' && matrix.target == 'native'
         run: sln-build-windows.bat ${{ matrix.arch }}
         shell: cmd
 
-      # Linux: GCC
+      # Build Linux: GCC
       - name: Build (Linux)
         if: runner.os == 'Linux' && matrix.target == 'native'
         run: |
@@ -101,15 +94,19 @@ jobs:
           ./cmake-build-linux.sh ${{ matrix.arch }}
         shell: bash
 
-      # macOS: Clang
+      # Build macOS: Clang
       - name: Build (macOS)
         if: runner.os == 'macOS' && matrix.target == 'native'
         run: |
           chmod +x cmake-build-macos.sh
-          ./cmake-build-macos.sh ${{ matrix.arch }}
+          if [[ "${{ matrix.arch }}" == "x64" ]]; then
+            arch -x86_64 ./cmake-build-macos.sh ${{ matrix.arch }}
+          else
+            ./cmake-build-macos.sh ${{ matrix.arch }}
+          fi
         shell: bash
 
-      # Android: Linux Android NDK
+      # Build Android: Linux Android NDK
       - name: Build for Android
         if: runner.os == 'Linux' && matrix.target == 'android'
         run: |
@@ -117,12 +114,12 @@ jobs:
           ./cmake-build-android.sh ${{ matrix.arch }}
         shell: bash
 
-      # Unix: List All File
+      # List Unix
       - name: List Dir (Unix)
         if: runner.os != 'Windows'
         run: find . -type f | sort
 
-      # Windows: List All File
+      # List Windows
       - name: List Dir (Windows)
         if: runner.os == 'Windows'
         run: |
