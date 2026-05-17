@@ -11,7 +11,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(/W3)
 else()
-    add_compile_options(-Wall -Wextra -Wunused-parameter) #提供更细致的检查，但是不要检查未使用的参数
+    add_compile_options(-Wall -Wextra -Wno-unused-parameter) #提供更细致的检查，但是不要检查未使用的参数
 endif()
 
 #公共编译定义
