@@ -54,13 +54,13 @@ public:
 	JNIInputStream &operator=(JNIInputStream &&) = delete;
 
 	/// @brief 下标访问运算符
-	const uint8_t &operator[](size_t index) const noexcept
+	uint8_t operator[](size_t index) const noexcept
 	{
 		return buffer[index];
 	}
 
 	/// @brief 获取下一个字节并推进读取位置
-	const uint8_t &GetNext() noexcept
+	uint8_t GetNext() noexcept
 	{
 		return buffer[position++];
 	}
