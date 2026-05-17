@@ -49,10 +49,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Resources", "Resources", "{
 		cmake-build-android.sh = cmake-build-android.sh
 		cmake-build-linux.sh = cmake-build-linux.sh
 		cmake-build-macos.sh = cmake-build-macos.sh
-		cmake-build-windows.bat = cmake-build-windows.bat
 		CMakeLists.txt = CMakeLists.txt
 		LibraryDependencies.props = LibraryDependencies.props
 		README.md = README.md
+		sln-build-windows.bat = sln-build-windows.bat
 	EndProjectSection
 EndProject
 Global
