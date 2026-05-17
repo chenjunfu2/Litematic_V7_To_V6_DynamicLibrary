@@ -55,5 +55,5 @@ del /Q UpgradeLog*.htm 2>nul
 "%MSBUILD%" Litematic_V7_To_V6_DynamicLibrary.sln /p:Configuration=Release /p:Platform=%PLATFORM% /m
 if %errorlevel% neq 0 exit /b %errorlevel%
 
-mkdir "%OUTDIR%"
-copy /Y ".\%PLATFORM%\Release\Litematic_V7_To_V6_DynamicLibrary.dll" "%OUTDIR%\"
+::mkdir "%OUTDIR%"
+::copy /Y ".\%PLATFORM%\Release\Litematic_V7_To_V6_DynamicLibrary.dll" "%OUTDIR%\"
