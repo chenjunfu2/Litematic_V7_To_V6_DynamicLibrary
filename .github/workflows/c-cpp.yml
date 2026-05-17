@@ -9,41 +9,85 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        target: [native, android]
-        exclude:
-          - os: windows-latest
-            target: android
-          - os: macos-latest
-            target: android
       fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            target: native
+            arch: x64
+            runner: windows-latest
+          - os: windows
+            target: native
+            arch: arm64
+            runner: windows-latest
+          - os: linux
+            target: native
+            arch: x64
+            runner: ubuntu-latest
+          - os: linux
+            target: native
+            arch: arm64
+            runner: ubuntu-latest
+          - os: linux
+            target: android
+            arch: x64
+            runner: ubuntu-latest
+          - os: linux
+            target: android
+            arch: arm64
+            runner: ubuntu-latest
+          - os: macos
+            target: native
+            arch: arm64
+            runner: macos-latest
+          - os: macos
+            target: native
+            arch: x64
+            runner: macos-latest-large
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows' && matrix.target == 'native'
+      # Windows
+      - name: Setup MSVC (Windows native x64)
+        if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'x64'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      - name: Setup GCC (Linux)
-        if: runner.os == 'Linux' && matrix.target == 'native'
+      # Windows
+      - name: Setup MSVC (Windows native arm64)
+        if: runner.os == 'Windows' && matrix.target == 'native' && matrix.arch == 'arm64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+
+      # Linux
+      - name: Setup GCC (Linux native x64)
+        if: runner.os == 'Linux' && matrix.target == 'native' && matrix.arch == 'x64'
         uses: egor-tensin/setup-gcc@v2
         with:
           version: latest
+          platform: x64
 
-      - name: Setup Clang (macOS)
+      # Linux
+      - name: Setup GCC (Linux native arm64)
+        if: runner.os == 'Linux' && matrix.target == 'native' && matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      # macOS
+      - name: Setup Clang (macOS native x64 & arm64)
         if: runner.os == 'macOS' && matrix.target == 'native'
         run: |
-          brew install llvm
-          echo "/usr/local/opt/llvm/bin" >> $GITHUB_PATH
-        shell: bash
+          echo "Using Xcode default toolchain"
+          clang --version
 
-      - name: Setup Android NDK (Linux)
+      # Android
+      - name: Setup Android NDK (Linux android x64 & arm64)
         if: runner.os == 'Linux' && matrix.target == 'android'
         uses: nttld/setup-ndk@v1
         with:
@@ -52,7 +96,7 @@ jobs:
       # Windows: MSVC (MSBuild)
       - name: Build (Windows)
         if: runner.os == 'Windows' && matrix.target == 'native'
-        run: cmake-build-windows.bat
+        run: cmake-build-windows.bat ${{ matrix.arch }}
         shell: cmd
 
       # Linux: GCC
@@ -60,7 +104,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.target == 'native'
         run: |
           chmod +x cmake-build-linux.sh
-          ./cmake-build-linux.sh
+          ./cmake-build-linux.sh ${{ matrix.arch }}
         shell: bash
 
       # macOS: Clang
@@ -68,7 +112,7 @@ jobs:
         if: runner.os == 'macOS' && matrix.target == 'native'
         run: |
           chmod +x cmake-build-macos.sh
-          ./cmake-build-macos.sh
+          ./cmake-build-macos.sh ${{ matrix.arch }}
         shell: bash
 
       # Android: Linux Android NDK
@@ -76,22 +120,25 @@ jobs:
         if: runner.os == 'Linux' && matrix.target == 'android'
         run: |
           chmod +x cmake-build-android.sh
-          ./cmake-build-android.sh
+          ./cmake-build-android.sh ${{ matrix.arch }}
         shell: bash
 
+      # Unix: List All File
       - name: List Dir (Unix)
         if: runner.os != 'Windows'
         run: find . -type f | sort
 
+      # Windows: List All File
       - name: List Dir (Windows)
         if: runner.os == 'Windows'
         run: |
           (Get-ChildItem -Recurse -File).FullName | Sort-Object
         shell: pwsh
 
+      # Upload build artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: ${{runner.os}}-${{matrix.target}}-artifacts
+          name: ${{ matrix.os }}-${{ matrix.target }}-${{ matrix.arch }}-artifacts
           path: artifacts/
           if-no-files-found: error
