@@ -17,7 +17,7 @@ if /I "%ARCH%"=="x64" (
     exit /b 1
 )
 
-set "OUTDIR=.\artifacts\windows-%ARCH%"
+set "OUTPUT_DIR=.\artifacts\windows-%ARCH%"
 
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "!VSWHERE!" (
@@ -55,6 +55,5 @@ del /Q UpgradeLog*.htm 2>nul
 "%MSBUILD%" Litematic_V7_To_V6_DynamicLibrary.sln /p:Configuration=Release /p:Platform=%PLATFORM% /m
 if %errorlevel% neq 0 exit /b %errorlevel%
 
-echo "%OUTDIR%"
-::mkdir "%OUTDIR%"
-::copy /Y ".\%PLATFORM%\Release\Litematic_V7_To_V6_DynamicLibrary.dll" "%OUTDIR%\"
+mkdir "%OUTPUT_DIR%"
+copy /Y ".\%PLATFORM%\Release\Litematic_V7_To_V6_DynamicLibrary.dll" "%OUTPUT_DIR%\"
