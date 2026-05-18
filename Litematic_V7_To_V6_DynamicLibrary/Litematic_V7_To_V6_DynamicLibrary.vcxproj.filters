@@ -16,17 +16,17 @@
     <Filter Include="头文件\jni">
       <UniqueIdentifier>{86107af5-9fe5-49cb-b6c8-4bd0245de77c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="头文件\jni\include">
-      <UniqueIdentifier>{fb5a6a17-c9f5-4c66-bc30-46554da72a22}</UniqueIdentifier>
+    <Filter Include="头文件\jni\x64">
+      <UniqueIdentifier>{95754bb2-8054-455f-aaab-834f1ccc889d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="资源文件\jni">
-      <UniqueIdentifier>{4756c5e0-d499-4322-a3d1-52a5a7a4b928}</UniqueIdentifier>
+    <Filter Include="头文件\jni\ARM64">
+      <UniqueIdentifier>{f1a601a8-3551-46b1-84da-0b7ee8790303}</UniqueIdentifier>
     </Filter>
-    <Filter Include="资源文件\jni\lib">
-      <UniqueIdentifier>{0c2ef0e7-3bd3-4ece-a6eb-3468d80cc396}</UniqueIdentifier>
+    <Filter Include="头文件\jni\ARM64\include">
+      <UniqueIdentifier>{ff51c7da-3b1f-41a3-935f-e54a5cef0544}</UniqueIdentifier>
     </Filter>
-    <Filter Include="资源文件\jni\dll">
-      <UniqueIdentifier>{4dea1c49-f5ac-4696-9d6d-a7a31c04e19b}</UniqueIdentifier>
+    <Filter Include="头文件\jni\x64\include">
+      <UniqueIdentifier>{e50c0d82-18a1-46a2-890c-858478111b7b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -47,25 +47,12 @@
     <ClInclude Include="Process_Litematic_Data.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="jni\include\jni.h">
-      <Filter>头文件\jni\include</Filter>
+    <ClInclude Include="jni\x64\include\jni_md.h">
+      <Filter>头文件\jni\x64\include</Filter>
     </ClInclude>
-    <ClInclude Include="jni\include\jni_md.h">
-      <Filter>头文件\jni\include</Filter>
+    <ClInclude Include="jni\x64\include\jni.h">
+      <Filter>头文件\jni\x64\include</Filter>
     </ClInclude>
-    <ClInclude Include="jni\include\dev_shun_litematica_extra_SchematicNativeReader.h">
-      <Filter>头文件\jni\include</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="jni\lib\jvm.lib">
-      <Filter>资源文件\jni\lib</Filter>
-    </Library>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="jni\dll\jvm.dll">
-      <Filter>资源文件\jni\dll</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt">

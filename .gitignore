@@ -368,3 +368,6 @@ build/
 # My
 *.litematic
 **/other/
+
+# Windows JNI
+!**/jni/*
