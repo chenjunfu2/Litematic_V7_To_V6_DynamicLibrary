@@ -252,6 +252,76 @@ public:
 	}
 };
 
+
+struct NBT_Compound_Accessor : public NBT_Type::Compound
+{
+	auto Find(const NBT_Type::String &key)
+	{
+		return NBT_Type::Compound::find(key);
+	}
+
+	const auto Find(const NBT_Type::String &key) const
+	{
+		return NBT_Type::Compound::find(key);
+	}
+};
+
+
+struct CompoundSort
+{
+	static inline bool bEnabled = true;
+
+	/// @brief 对给定的 Compound 对象进行排序，返回指向其元素的迭代器向量。
+	/// @param cpdSort 需要排序的 Compound 对象。
+	/// @return `std::vector<NBT_Type::Compound::Const_Iterator>`，其中迭代器按排序顺序排列。
+	std::vector<NBT_Type::Compound::Const_Iterator> operator()(const NBT_Type::Compound &cpdSort)
+	{
+		if (!bEnabled)
+		{
+			return cpdSort.KeySortIt<>();
+		}
+		bEnabled = false;
+
+		std::vector<NBT_Type::Compound::Const_Iterator> vSortCompound{};
+		vSortCompound.reserve(cpdSort.Size());
+		for (auto it = cpdSort.begin(), end = cpdSort.end(); it != end; ++it)
+		{
+			vSortCompound.push_back(it);
+		}
+
+		std::sort(vSortCompound.begin(), vSortCompound.end(),
+			[](const auto &l, const auto &r) -> bool
+			{
+				static std::unordered_map<NBT_Type::String, uint64_t> mapPriority =
+				{
+					{MU8STR("MinecraftDataVersion"),	0},
+					{MU8STR("Version"),					1},
+					{MU8STR("SubVersion"),				2},
+					{MU8STR("Metadata"),				3},
+					{MU8STR("Regions"),					4},
+				};
+
+				auto itL = mapPriority.find(l->first);
+				auto itR = mapPriority.find(r->first);
+
+				uint64_t u64LPriority = itL == mapPriority.end() ? (uint64_t)-1 : itL->second;
+				uint64_t u64RPriority = itR == mapPriority.end() ? (uint64_t)-1 : itR->second;
+
+				if (u64LPriority != u64RPriority)//都没找到才不成立
+				{
+					return u64LPriority < u64RPriority;
+				}
+				else
+				{
+					return l->first < r->first;
+				}
+			}
+		);
+
+		return vSortCompound;
+	}
+};
+
 extern "C"
 {
 	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_V7_1To_1V6(JNIEnv * env, jclass clazz, jbyteArray input)//jobject obj
@@ -290,7 +360,7 @@ extern "C"
 					throw std::runtime_error(std::string(e.what()) += "\nUnable to convert v7_data to v6_data!");
 				}
 
-				if (!NBT_Writer::WriteNBT(outputV6Stream, cpdV6Output, 512, NBT_Print{ NULL,NULL,NULL }))
+				if (!NBT_Writer::WriteNBT<CompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_Print{ NULL,NULL,NULL }))
 				{
 					throw std::runtime_error("Unable to write data into stream!\n");
 				}
