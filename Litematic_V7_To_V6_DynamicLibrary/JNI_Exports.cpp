@@ -267,21 +267,26 @@ struct NBT_Compound_Accessor : public NBT_Type::Compound
 };
 
 
-struct CompoundSort
+struct MyCompoundSort
 {
-	static inline bool bEnabled = true;
+	static inline uint8_t u8Enabled;
+
+	static void Reset()
+	{
+		u8Enabled = 2;
+	}
 
 	/// @brief 对给定的 Compound 对象进行排序，返回指向其元素的迭代器向量。
 	/// @param cpdSort 需要排序的 Compound 对象。
 	/// @return `std::vector<NBT_Type::Compound::Const_Iterator>`，其中迭代器按排序顺序排列。
 	std::vector<NBT_Type::Compound::Const_Iterator> operator()(const NBT_Type::Compound &cpdSort)
 	{
-		if (!bEnabled)
+		if (u8Enabled == 0 || u8Enabled-- > 1)
 		{
 			return cpdSort.KeySortIt<>();
 		}
-		bEnabled = false;
 
+		//第二层使用自定义排序
 		std::vector<NBT_Type::Compound::Const_Iterator> vSortCompound{};
 		vSortCompound.reserve(cpdSort.Size());
 		for (auto it = cpdSort.begin(), end = cpdSort.end(); it != end; ++it)
@@ -360,7 +365,8 @@ extern "C"
 					throw std::runtime_error(std::string(e.what()) += "\nUnable to convert v7_data to v6_data!");
 				}
 
-				if (!NBT_Writer::WriteNBT<CompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_Print{ NULL,NULL,NULL }))
+				MyCompoundSort::Reset();
+				if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_Print{ NULL,NULL,NULL }))
 				{
 					throw std::runtime_error("Unable to write data into stream!\n");
 				}
