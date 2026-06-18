@@ -252,21 +252,6 @@ public:
 	}
 };
 
-
-struct NBT_Compound_Accessor : public NBT_Type::Compound
-{
-	auto Find(const NBT_Type::String &key)
-	{
-		return NBT_Type::Compound::find(key);
-	}
-
-	const auto Find(const NBT_Type::String &key) const
-	{
-		return NBT_Type::Compound::find(key);
-	}
-};
-
-
 struct MyCompoundSort
 {
 	static inline uint8_t u8Enabled;
