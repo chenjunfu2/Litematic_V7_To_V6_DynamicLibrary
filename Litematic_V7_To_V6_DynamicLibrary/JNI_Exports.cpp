@@ -1,9 +1,11 @@
 ﻿#include "Litematic_V7_To_V6.h"
 
 #include <stdexcept>
+#include <format>
 #include <stdint.h>
 #include <jni.h>
 
+#define JBYTEARRAY_MAXSIZE (INT32_MAX - 8)
 
 /// @brief JNI 输入流适配器，用于从 jbyteArray 读取数据
 class JNIInputStream
@@ -233,11 +235,9 @@ public:
 	/// @return 新创建的 jbyteArray，需要调用者用 DeleteLocalRef 释放
 	jbyteArray ToJByteArray()
 	{
-		if (buffer.size() > INT64_MAX)
+		if (buffer.size() > JBYTEARRAY_MAXSIZE)
 		{
-			throw std::runtime_error("JNI byte array size exceeds maximum allowed limit: " +
-				std::to_string(buffer.size()) + " bytes (max: " +
-				std::to_string(INT64_MAX) + " bytes)");
+			throw std::runtime_error(std::format("JNI byte array size exceeds maximum allowed limit: {} bytes (max: {} bytes)", buffer.size(), JBYTEARRAY_MAXSIZE));
 		}
 
 		jsize len = (jsize)buffer.size();
