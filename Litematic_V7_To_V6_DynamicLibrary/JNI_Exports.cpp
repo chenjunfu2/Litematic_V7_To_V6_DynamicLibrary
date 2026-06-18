@@ -344,7 +344,7 @@ extern "C"
 			{
 				JNIInputStream inputV7Stream(env, input);
 				szV7StreamSize = inputV7Stream.Size();
-				if (!NBT_Reader::ReadNBT(inputV7Stream, cpdTmpV7Input, 512, NBT_Print{ NULL,NULL,NULL }))
+				if (!NBT_Reader::ReadNBT(inputV7Stream, cpdTmpV7Input, 512, NBT_NoPrint{}))
 				{
 					throw std::runtime_error("Unable to parse data from stream!");
 				}
@@ -366,7 +366,7 @@ extern "C"
 				}
 
 				MyCompoundSort::Reset();
-				if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_Print{ NULL,NULL,NULL }))
+				if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_NoPrint{}))
 				{
 					throw std::runtime_error("Unable to write data into stream!\n");
 				}
@@ -388,6 +388,67 @@ extern "C"
 		}
 		catch (...)
 		{
+			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
+			if (exceptionClass != nullptr)
+			{
+				env->ThrowNew(exceptionClass, "Unknown Exception");
+				env->DeleteLocalRef(exceptionClass);
+			}
+			return nullptr;
+		}
+	}
+
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_SortLitematic(JNIEnv *env, jclass clazz, jbyteArray input)
+	{
+		if (input == nullptr)
+		{
+			return nullptr;
+		}
+
+		try
+		{
+			// 创建输入流
+			NBT_Type::Compound cpdSortTemp{};
+			size_t szStreamSize = 0;
+			{
+				JNIInputStream inputStream(env, input);
+				szStreamSize = inputStream.Size();
+				if (!NBT_Reader::ReadNBT(inputStream, cpdSortTemp, 512, NBT_NoPrint{}))
+				{
+					throw std::runtime_error("Unable to parse data from stream!");
+				}
+			}
+
+			// 创建输出流
+			JNIOutputStream outputStream(env, szStreamSize);
+			MyCompoundSort::Reset();
+			if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputStream, cpdSortTemp, 512, NBT_NoPrint{}))
+			{
+				throw std::runtime_error("Unable to write data into stream!\n");
+			}
+
+			// 返回结果
+			return outputStream.ToJByteArray();
+		}
+		catch (const std::exception &e)
+		{
+			// 可以选择抛出 Java 异常
+			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
+			if (exceptionClass != nullptr)
+			{
+				env->ThrowNew(exceptionClass, e.what());
+				env->DeleteLocalRef(exceptionClass);
+			}
+			return nullptr;
+		}
+		catch (...)
+		{
+			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
+			if (exceptionClass != nullptr)
+			{
+				env->ThrowNew(exceptionClass, "Unknown Exception");
+				env->DeleteLocalRef(exceptionClass);
+			}
 			return nullptr;
 		}
 	}
