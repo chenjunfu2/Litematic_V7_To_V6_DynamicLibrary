@@ -383,7 +383,7 @@ extern "C"
 		}
 	}
 
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_SortLitematic(JNIEnv *env, jclass clazz, jbyteArray input)
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_sortFields(JNIEnv *env, jclass clazz, jbyteArray input)
 	{
 		if (input == nullptr)
 		{
