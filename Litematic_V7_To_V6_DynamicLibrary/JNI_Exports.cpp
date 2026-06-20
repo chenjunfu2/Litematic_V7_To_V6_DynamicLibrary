@@ -442,7 +442,7 @@ extern "C"
 		}
 	}
 
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeSortFields(JNIEnv *env, jclass clazz, jbyteArray input, jobject fieldModes)
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeEraseFields(JNIEnv *env, jclass clazz, jbyteArray input, jobject fieldModes)
 	{
 		if (input == nullptr || fieldModes == nullptr)
 		{
