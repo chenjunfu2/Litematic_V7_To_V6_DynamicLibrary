@@ -1,4 +1,4 @@
-﻿#include "Litematic_V7_To_V6.h"
+﻿#include "LitematicConversion.hpp"
 
 #include <stdexcept>
 #include <format>
@@ -314,7 +314,7 @@ struct MyCompoundSort
 
 extern "C"
 {
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_V7_1To_1V6(JNIEnv * env, jclass clazz, jbyteArray input)//jobject obj
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_nativeV7ToV6(JNIEnv * env, jclass clazz, jbyteArray input)//jobject obj
 	{
 		if (input == nullptr)
 		{
@@ -343,11 +343,15 @@ extern "C"
 				NBT_Type::Compound cpdV7Input = std::move(cpdTmpV7Input);
 				try
 				{
-					ConvertLitematicData_V7_To_V6(cpdV7Input, cpdV6Output);//从cpdV7Input转换到cpdV6Output
+					std::string strErrMsg;
+					if (!ConvertLitematicData_V7_To_V6(cpdV7Input, cpdV6Output, strErrMsg))//从cpdV7Input转换到cpdV6Output
+					{
+						throw std::runtime_error(strErrMsg);
+					}
 				}
 				catch (const std::exception &e)
 				{
-					throw std::runtime_error(std::string(e.what()) += "\nUnable to convert v7_data to v6_data!");
+					throw std::runtime_error(std::format("Unable to convert v7_data to v6_data: [{}]", e.what()));
 				}
 
 				MyCompoundSort::Reset();
@@ -383,7 +387,7 @@ extern "C"
 		}
 	}
 
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_sortFields(JNIEnv *env, jclass clazz, jbyteArray input)
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeSortFields(JNIEnv *env, jclass clazz, jbyteArray input)
 	{
 		if (input == nullptr)
 		{
@@ -436,5 +440,16 @@ extern "C"
 			}
 			return nullptr;
 		}
+	}
+
+	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeSortFields(JNIEnv *env, jclass clazz, jbyteArray input, jobject fieldModes)
+	{
+		if (input == nullptr || fieldModes == nullptr)
+		{
+			return nullptr;
+		}
+
+
+		return nullptr;
 	}
 }
