@@ -14,7 +14,7 @@ public:
 
 	struct NameStep
 	{
-		NBT_Type::String strStep;
+		NBT_Type::String strStep = {};//默认空字符串
 	};
 
 	struct IndexStep//默认值为全覆盖
@@ -33,15 +33,44 @@ public:
 		ParseError(const char *message, size_t position)
 			: std::runtime_error(std::format("{} at position {}", message, position))
 		{}
+
+		ParseError(const std::string &message, size_t position)
+			: std::runtime_error(std::format("{} at position {}", message, position))
+		{}
 	};
+
+	static size_t ParseNumber(const MUTF8_Char_Type *pBase, const NBT_Type::String::View &strNumber)
+	{
+		size_t szRet = 0;
+		auto result = std::from_chars((const char *)strNumber.data(), (const char *)strNumber.data() + strNumber.size(), szRet);
+		if (result.ptr != (const char *)strNumber.data() + strNumber.size())
+		{
+			throw ParseError(std::format("Invalid number format: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+		}
+
+		switch (result.ec)
+		{
+		case std::errc{}:
+			return szRet;
+			break;
+		case std::errc::invalid_argument:
+			throw ParseError(std::format("Invalid number format: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+		case std::errc::result_out_of_range:
+			throw ParseError(std::format("Number out of range: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+		default:
+			throw ParseError("", result.ptr - (const char *)pBase);
+			break;
+		}
+	}
 
 	static Step ParseIndexStep(const MUTF8_Char_Type *pBase, NBT_Type::String::View &strPath)
 	{
 		//进入此处，当前字符[0]为'['
+		size_t szBaseLSqBracketPos = strPath.data() - pBase;//记录 '[' 的位置
 		size_t szRSqBracketPos = strPath.find_first_of(']', 1);//从[的下一个字符开始查找
 		if (szRSqBracketPos == strPath.npos)
 		{
-			throw ParseError("Missing ']'", strPath.data() - pBase);
+			throw ParseError("Missing ']'", szBaseLSqBracketPos);
 		}
 
 		//获取不带右方括号的内部值
@@ -56,11 +85,11 @@ public:
 			size_t szNextDelimiterPos = szDelimiterBegPos + 1;//下一个.的位置
 			if (szNextDelimiterPos >= strRange.size())
 			{
-				throw ParseError("Expected '..' but only found '.' and nothing after", strPath.data() - pBase);
+				throw ParseError("Expected '..' but only found '.' and nothing after", szBaseLSqBracketPos + 1 + szDelimiterBegPos);
 			}
 			if (strRange[szNextDelimiterPos] != '.')
 			{
-				throw ParseError("Expected '..' for range, found single '.'", strPath.data() - pBase);
+				throw ParseError("Expected '..' for range, found single '.'", szBaseLSqBracketPos + 1 + szDelimiterBegPos);
 			}
 
 			szDelimiterEndPos = szDelimiterBegPos + 2;//设置到尾后
@@ -73,13 +102,7 @@ public:
 			}
 			else//[I]格式
 			{
-				size_t szIVal;
-				auto result = std::from_chars((const char *)strRange.data(), (const char *)strRange.data() + strRange.size(), szIVal);
-				if (result.ec != std::errc{} || result.ptr != (const char *)strRange.data() + strRange.size())
-				{
-					throw ParseError("Invalid index value", strPath.data() - pBase);
-				}
-
+				size_t szIVal = ParseNumber(pBase, strRange);
 				return Step{ IndexStep{szIVal, szIVal} };//单索引形式
 			}
 		}
@@ -90,31 +113,23 @@ public:
 		NBT_Type::String::View strNumLeft = strRange.substr(0, szDelimiterBegPos);
 		if (!strNumLeft.empty())
 		{
-			auto result = std::from_chars((const char *)strNumLeft.data(), (const char *)strNumLeft.data() + strNumLeft.size(), stepIdx.szBeg);
-			if (result.ec != std::errc{} || result.ptr != (const char *)strNumLeft.data() + strNumLeft.size())
-			{
-				throw ParseError("Invalid start index in range", strPath.data() - pBase);
-			}
+			stepIdx.szBeg = ParseNumber(pBase, strNumLeft);
 		}
 
 		NBT_Type::String::View strNumRight = strRange.substr(szDelimiterEndPos);
 		if (!strNumRight.empty())
 		{
-			auto result = std::from_chars((const char *)strNumRight.data(), (const char *)strNumRight.data() + strNumRight.size(), stepIdx.szEnd);
-			if (result.ec != std::errc{} || result.ptr != (const char *)strNumRight.data() + strNumRight.size())
-			{
-				throw ParseError("Invalid end index in range", strPath.data() - pBase);
-			}
+			stepIdx.szEnd = ParseNumber(pBase, strNumRight);
 		}
 
 		if (stepIdx.szBeg > stepIdx.szEnd)//允许相等，退化为单索引形式
 		{
-			throw ParseError("Start index must not be greater than end index", strPath.data() - pBase);
+			throw ParseError(std::format("Start index ({}) must not be greater than end index ({})", stepIdx.szBeg, stepIdx.szEnd), szBaseLSqBracketPos + 1 + szDelimiterBegPos);
 		}
 
 		if (strNumLeft.empty() && strNumRight.empty())
 		{
-			throw ParseError("Range must specify at least one bound (e.g., [N..], [..M], [N..M])", strPath.data() - pBase);
+			throw ParseError("Range must specify at least one bound (e.g., [N..], [..M], [N..M])", szBaseLSqBracketPos + 1 + szDelimiterBegPos);
 		}
 
 		return Step{ stepIdx };
@@ -122,6 +137,7 @@ public:
 
 	static Step ParsePlainNameStep(const MUTF8_Char_Type *pBase, NBT_Type::String::View &strPath)
 	{
+		//进入时第一个字符为正常字符
 		size_t szEndPos = strPath.find_first_of('/');//直接找到路径结束
 		if (szEndPos == 0)
 		{
@@ -136,7 +152,7 @@ public:
 		size_t szErrCharPos = stepName.strStep.find_first_of(MU8STR("[]\"\\"));//如果出现其它异常字符则出错
 		if (szErrCharPos != stepName.strStep.npos)
 		{
-			throw ParseError("Invalid character in plain name", strPath.data() - pBase + szErrCharPos);
+			throw ParseError(std::format("Invalid character '{}' in plain name", stepName.strStep[szErrCharPos]), strPath.data() - pBase + szErrCharPos);
 		}
 
 		//删除
@@ -147,7 +163,50 @@ public:
 
 	static Step ParseQuotedNameStep(const MUTF8_Char_Type *pBase, NBT_Type::String::View &strPath)
 	{
+		//进入时第一个字符为起始引号
+		strPath.remove_prefix(1);//移除
 
+		//空键名""
+		if (!strPath.empty() && strPath.front() == '"')
+		{
+			strPath.remove_prefix(1);//移除结束的"
+			return Step{ NameStep{} };
+		}
+
+		NameStep stepName{};
+		while (!strPath.empty())
+		{
+			const auto it = strPath.front();
+			strPath.remove_prefix(1);
+			switch (it)
+			{
+			case '\\':
+				if (strPath.empty())//转义符后是空
+				{
+					throw ParseError("Unexpected end after escape '\\'", strPath.data() - pBase);
+				}
+
+				if (strPath.front() == '\\' || strPath.front() == '\"')//下一字符
+				{
+					stepName.strStep.push_back(strPath.front());//丢弃转义，只保留下一字符
+					strPath.remove_prefix(1);//移除
+				}
+				else//非法字符
+				{
+					throw ParseError(std::format("Invalid escape sequence: '\\{}'", strPath.front()), strPath.data() - pBase - 1);
+				}
+				break;
+			case '\"'://结束字符（引号结束）
+				return Step{ std::move(stepName) };//右引号正常返回，如果不为空，下一字符必须是路径分隔符/，否则出错（此处判定在外侧存在，无需重复判定）
+				break;
+			default://其它字符，正常插入
+				stepName.strStep.push_back(it);
+				break;
+			}
+		}
+
+		//没找到右引号就退出
+		throw ParseError("Unterminated quoted name", strPath.data() - pBase);
 	}
 	
 
@@ -188,12 +247,12 @@ public:
 			{
 				if (strPath.front() != '/')
 				{
-					throw ParseError("Expected '/' after step", strPath.data() - pBase);
+					throw ParseError(std::format("Expected '/' after step, but found '{}'", strPath.front()), strPath.data() - pBase);
 				}
 				strPath.remove_prefix(1);//删除一个（跳过'/'）
 				if (strPath.empty())// 禁止以 '/' 结尾（会导致下一个步为空名字）
 				{
-					throw ParseError("Path cannot end with '/'", strPath.data() - pBase);
+					throw ParseError("Path cannot end with '/'", strPath.data() - 1 - pBase);
 				}
 			}
 		}
