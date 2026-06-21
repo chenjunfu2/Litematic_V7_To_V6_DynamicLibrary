@@ -12,13 +12,20 @@ public:
 		CLEAR,
 	};
 
-	struct SegPathInfo
+	struct NameStep
 	{
-		bool bIsList;//列表特殊处理（下标处理）
-		NBT_Type::String strSegmentPath;
+		NBT_Type::String strStep;
 	};
 
-	using PathInfo = std::vector<SegPathInfo>;
+	struct IndexStep
+	{
+		size_t szBeg = 0;
+		size_t szEnd = SIZE_MAX;
+	};
+
+	using Step = std::variant<NameStep, IndexStep>;
+
+	using PathInfo = std::vector<Step>;
 
 	static PathInfo FullPathToPathInfo(const NBT_Type::String &strFullPath)
 	{
