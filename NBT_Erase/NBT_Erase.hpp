@@ -1,15 +1,27 @@
-﻿#include <nbt_cpp/NBT_All.hpp>
+﻿#pragma once
+
+#include <nbt_cpp/NBT_All.hpp>
 
 #include <charconv>
 #include <format>
 
-struct EraseRequest
+#define MU8CV2CTU8(mu8String) MUTF8_Tool<MUTF8_Char_Type, char16_t, char>::MU8ToU8(mu8String)
+
+struct NbtPath
 {
 public:
-	enum EraseMode
+	class ParseError : public std::runtime_error
 	{
-		REMOVE,
-		CLEAR,
+	public:
+		const size_t position;
+	public:
+		ParseError(const char *message, size_t _position): position(_position),
+			std::runtime_error(std::format("{} at position {}", message, position))
+		{}
+
+		ParseError(const std::string &message, size_t _position): position(_position),
+			std::runtime_error(std::format("{} at position {}", message, position))
+		{}
 	};
 
 	struct NameStep
@@ -23,29 +35,24 @@ public:
 		size_t szEnd = SIZE_MAX;
 	};
 
-	using Step = std::variant<NameStep, IndexStep>;
-
-	using PathInfo = std::vector<Step>;
-
-	class ParseError : public std::runtime_error
+	enum class StepType : size_t
 	{
-	public:
-		ParseError(const char *message, size_t position)
-			: std::runtime_error(std::format("{} at position {}", message, position))
-		{}
-
-		ParseError(const std::string &message, size_t position)
-			: std::runtime_error(std::format("{} at position {}", message, position))
-		{}
+		NONE = -1,
+		Name = 0,
+		Index = 1,
 	};
 
+	using Step = std::variant<NameStep, IndexStep>;
+	using PathInfo = std::vector<Step>;
+
+protected:
 	static size_t ParseNumber(const MUTF8_Char_Type *pBase, const NBT_Type::String::View &strNumber)
 	{
 		size_t szRet = 0;
 		auto result = std::from_chars((const char *)strNumber.data(), (const char *)strNumber.data() + strNumber.size(), szRet);
 		if (result.ptr != (const char *)strNumber.data() + strNumber.size())
 		{
-			throw ParseError(std::format("Invalid number format: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+			throw ParseError(std::format("Invalid number format: '{}'", MU8CV2CTU8(strNumber)), result.ptr - (const char *)pBase);
 		}
 
 		switch (result.ec)
@@ -54,9 +61,9 @@ public:
 			return szRet;
 			break;
 		case std::errc::invalid_argument:
-			throw ParseError(std::format("Invalid number format: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+			throw ParseError(std::format("Invalid number format: '{}'", MU8CV2CTU8(strNumber)), result.ptr - (const char *)pBase);
 		case std::errc::result_out_of_range:
-			throw ParseError(std::format("Number out of range: '{}'", strNumber.GetCharTypeView()), result.ptr - (const char *)pBase);
+			throw ParseError(std::format("Number out of range: '{}'", MU8CV2CTU8(strNumber)), result.ptr - (const char *)pBase);
 		default:
 			throw ParseError("", result.ptr - (const char *)pBase);
 			break;
@@ -208,8 +215,8 @@ public:
 		//没找到右引号就退出
 		throw ParseError("Unterminated quoted name", strPath.data() - pBase);
 	}
-	
 
+public:
 	static PathInfo PathParser(NBT_Type::String::View strPath)
 	{
 		if (strPath.empty())
@@ -259,22 +266,102 @@ public:
 
 		return path;
 	}
+public:
+	PathInfo stPathInfo;
 
 public:
-	PathInfo vPath;
-	EraseMode enMode;
+	NbtPath(const NBT_Type::String &strPath) : stPathInfo(PathParser(NBT_Type::String::View(strPath)))
+	{}
+	NbtPath(const NBT_Type::String::View &strvPath) : stPathInfo(PathParser(strvPath))
+	{}
+	NbtPath(void) = default;
+	~NbtPath(void) = default;
+
+	std::string Print(void) const
+	{
+		std::string strRet;
+
+		for (const auto &it : stPathInfo)
+		{
+			switch ((StepType)it.index())
+			{
+			case NbtPath::StepType::NONE:
+				strRet += std::format("[[None Value]]");
+				break;
+			case NbtPath::StepType::Name:
+				strRet += std::format("{}/", std::get<NameStep>(it).strStep.ToCharTypeUTF8());
+				break;
+			case NbtPath::StepType::Index:
+				{
+					const auto &tmp = std::get<IndexStep>(it);
+
+					if (tmp.szBeg == tmp.szEnd)
+					{
+						strRet += std::format("[{}]/", tmp.szBeg);
+					}
+					else
+					{
+						if (tmp.szBeg == 0 && tmp.szEnd == SIZE_MAX)
+						{
+							strRet += "[]/";
+						}
+						else
+						{
+							std::string strBeg = tmp.szBeg == 0 ? "" : std::format("{}", tmp.szBeg);
+							std::string strEnd = tmp.szEnd == SIZE_MAX ? "" : std::format("{}", tmp.szEnd);
+							strRet += std::format("[{}..{}]/", strBeg, strEnd);
+						}
+					}
+				}
+				break;
+			default:
+				strRet += std::format("[[Unknown Value]]");
+				break;
+			}
+		}
+
+		strRet.pop_back();//删除末尾/
+		return strRet;
+	}
+
 };
 
+struct EraseRequest
+{
+public:
+	enum EraseMode
+	{
+		REMOVE,
+		CLEAR,
+		UNKNOWN,
+	};
+
+public:
+	NbtPath stNbtPath{};
+	EraseMode enMode = UNKNOWN;
+
+public:
+	std::string Print(void) const
+	{
+		std::string strRet = "EraseMode: [";
+		switch (enMode)
+		{
+		case EraseRequest::REMOVE:
+			strRet += "REMOVE] ";
+			break;
+		case EraseRequest::CLEAR:
+			strRet += "CLEAR] ";
+			break;
+		case EraseRequest::UNKNOWN:
+		default:
+			strRet += "UNKNOWN] ";
+			break;
+		}
+
+		strRet += std::format("Path: {}", stNbtPath.Print());
+		return strRet;
+	}
+};
 
 using RequestList = std::vector<EraseRequest>;
-
-
-
-
-
-
-
-
-
-
 
