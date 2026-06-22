@@ -159,7 +159,7 @@ protected:
 		size_t szErrCharPos = stepName.strStep.find_first_of(MU8STR("[]\"\\"));//如果出现其它异常字符则出错
 		if (szErrCharPos != stepName.strStep.npos)
 		{
-			throw ParseError(std::format("Invalid character '{}' in plain name", stepName.strStep[szErrCharPos]), strPath.data() - pBase + szErrCharPos);
+			throw ParseError(std::format("Invalid character '{}' in plain name", (char)stepName.strStep[szErrCharPos]), strPath.data() - pBase + szErrCharPos);
 		}
 
 		//删除
@@ -200,7 +200,7 @@ protected:
 				}
 				else//非法字符
 				{
-					throw ParseError(std::format("Invalid escape sequence: '\\{}'", strPath.front()), strPath.data() - pBase - 1);
+					throw ParseError(std::format("Invalid escape sequence: '\\{}'", (char)strPath.front()), strPath.data() - pBase - 1);
 				}
 				break;
 			case '\"'://结束字符（引号结束）
@@ -254,7 +254,7 @@ public:
 			{
 				if (strPath.front() != '/')
 				{
-					throw ParseError(std::format("Expected '/' after step, but found '{}'", strPath.front()), strPath.data() - pBase);
+					throw ParseError(std::format("Expected '/' after step, but found '{}'", (char)strPath.front()), strPath.data() - pBase);
 				}
 				strPath.remove_prefix(1);//删除一个（跳过'/'）
 				if (strPath.empty())// 禁止以 '/' 结尾（会导致下一个步为空名字）
