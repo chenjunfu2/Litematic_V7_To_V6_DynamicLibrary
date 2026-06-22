@@ -98,7 +98,7 @@ void print_error_context(const NBT_Type::String::View &str, size_t pos)
 	}
 
 	print("error: {}\n", u8Str); // 第一行：路径原文
-	print("{:>{}}^\n", "", 8 + col);// 第二行：对齐指示符（"error : " 占 8 列，再加上 col 列空白）
+	print("{:>{}}^\n", "", 7 + col);// 第二行：对齐指示符（"error : " 占 8 列，再加上 col 列空白）
 }
 
 int main(void)

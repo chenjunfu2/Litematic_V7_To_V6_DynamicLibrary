@@ -15,12 +15,12 @@ public:
 	public:
 		const size_t position;
 	public:
-		ParseError(const char *message, size_t _position): position(_position),
-			std::runtime_error(std::format("{} at position {}", message, position))
+		ParseError(const char *message, size_t _position):
+			std::runtime_error(std::format("{} at position {}", message, _position)), position(_position)
 		{}
 
-		ParseError(const std::string &message, size_t _position): position(_position),
-			std::runtime_error(std::format("{} at position {}", message, position))
+		ParseError(const std::string &message, size_t _position):
+			std::runtime_error(std::format("{} at position {}", message, _position)), position(_position)
 		{}
 	};
 
@@ -289,7 +289,27 @@ public:
 				strRet += std::format("[[None Value]]");
 				break;
 			case NbtPath::StepType::Name:
-				strRet += std::format("{}/", std::get<NameStep>(it).strStep.ToCharTypeUTF8());
+				{
+					const auto &tmp = std::get<NameStep>(it).strStep;
+					if (!tmp.empty() && tmp.find_first_of(MU8STR("/[]\"\\")) == tmp.npos)//普通字符且非空键名
+					{
+						strRet += std::format("{}/", tmp.ToCharTypeUTF8());
+						break;
+					}
+
+					//需要引号并添加转义
+					NBT_Type::String newStr{};
+					for (const auto &ch : tmp)
+					{
+						if (ch == '"' || ch == '\\')
+						{
+							newStr.push_back('\\');
+						}
+						newStr.push_back(ch);
+					}
+
+					strRet += std::format("\"{}\"/", newStr.ToCharTypeUTF8());
+				}
 				break;
 			case NbtPath::StepType::Index:
 				{
@@ -329,7 +349,7 @@ public:
 struct EraseRequest
 {
 public:
-	enum EraseMode
+	enum class EraseMode : uint8_t
 	{
 		REMOVE,
 		CLEAR,
@@ -338,7 +358,7 @@ public:
 
 public:
 	NbtPath stNbtPath{};
-	EraseMode enMode = UNKNOWN;
+	EraseMode enMode = EraseMode::UNKNOWN;
 
 public:
 	std::string Print(void) const
@@ -346,13 +366,13 @@ public:
 		std::string strRet = "EraseMode: [";
 		switch (enMode)
 		{
-		case EraseRequest::REMOVE:
+		case EraseRequest::EraseMode::REMOVE:
 			strRet += "REMOVE] ";
 			break;
-		case EraseRequest::CLEAR:
+		case EraseRequest::EraseMode::CLEAR:
 			strRet += "CLEAR] ";
 			break;
-		case EraseRequest::UNKNOWN:
+		case EraseRequest::EraseMode::UNKNOWN:
 		default:
 			strRet += "UNKNOWN] ";
 			break;
