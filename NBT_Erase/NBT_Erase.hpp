@@ -381,6 +381,28 @@ public:
 		strRet += std::format("Path: {}", stNbtPath.Print());
 		return strRet;
 	}
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 };
 
 using RequestList = std::vector<EraseRequest>;

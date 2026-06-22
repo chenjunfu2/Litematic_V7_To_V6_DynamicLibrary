@@ -10,53 +10,6 @@ void print(const std::format_string<Args...> fmt, Args&&... args)
 	fwrite(tmp.data(), sizeof(tmp.data()[0]), tmp.size(), stdout);
 }
 
-const NBT_Type::String::View test_paths[] =
-{
-	// 有效路径（应成功定位）
-	MU8STRV("simple/value"),
-	MU8STRV("\"weird/key\"/inner"),
-	MU8STRV("\"my\\\"quote\"/x"),
-	MU8STRV("\"back\\\\slash\"/y"),
-	MU8STRV("\"arr[0]\"/data"),
-	MU8STRV("empty/\"\""),
-	MU8STRV("list/[]"),
-	MU8STRV("list/[]/a"),
-	MU8STRV("list/[0]"),
-	MU8STRV("list/[0]/a"),
-	MU8STRV("list/[0]/b"),
-	MU8STRV("list/[0..1]"),
-	MU8STRV("list/[0..1]/a"),
-	MU8STRV("list/[..0]"),
-	MU8STRV("list/[1..]"),
-	MU8STRV("nested_lists/[]"),
-	MU8STRV("nested_lists/[0]"),
-	MU8STRV("nested_lists/[0]/[]"),
-	MU8STRV("nested_lists/[1]/[]"),
-	MU8STRV("nested_lists/[]/[1]"),
-	MU8STRV("nested_lists/[1]/[0]"),
-
-	// 错误路径（应报告错误）
-	MU8STRV("simple/[0]"),
-	MU8STRV("list/a"),
-	MU8STRV("list/[0]/a/extra"),
-	MU8STRV("\"bad\\escape\""),
-	MU8STRV("\"unclosed"),
-	MU8STRV("ab\"cd"),
-	MU8STRV("a//b"),
-	MU8STRV("list/[-1]"),
-	MU8STRV("list/[2]"),
-	MU8STRV("list/[1..0]"),
-	MU8STRV("list/[0..]extra"),
-	MU8STRV("\"weird/key/inner\""),
-
-	// 边界/特殊用例
-	MU8STRV("list"),
-	MU8STRV("empty"),
-	MU8STRV("\"empty\"/\"\""),
-	MU8STRV("\"list\""),
-	MU8STRV("list/[0]/"),
-};
-
 // 打印错误上下文：显示路径字符串，并用 ^ 指示错误位置
 void print_error_context(const NBT_Type::String::View &str, size_t pos)
 {
@@ -98,11 +51,59 @@ void print_error_context(const NBT_Type::String::View &str, size_t pos)
 	}
 
 	print("error: {}\n", u8Str); // 第一行：路径原文
-	print("{:>{}}^\n", "", 7 + col);// 第二行：对齐指示符（"error : " 占 8 列，再加上 col 列空白）
+	print("{:>{}}^\n", "", 7 + col);// 第二行：对齐指示符（"error: " 占 7 列，再加上 col 列空白）
 }
 
-int main(void)
+
+void ParseTest(void)
 {
+	static constexpr NBT_Type::String::View test_paths[] =
+	{
+		// 有效路径（应成功定位）
+		MU8STRV("simple/value"),
+		MU8STRV("\"weird/key\"/inner"),
+		MU8STRV("\"my\\\"quote\"/x"),
+		MU8STRV("\"back\\\\slash\"/y"),
+		MU8STRV("\"arr[0]\"/data"),
+		MU8STRV("empty/\"\""),
+		MU8STRV("list/[]"),
+		MU8STRV("list/[]/a"),
+		MU8STRV("list/[0]"),
+		MU8STRV("list/[0]/a"),
+		MU8STRV("list/[0]/b"),
+		MU8STRV("list/[0..1]"),
+		MU8STRV("list/[0..1]/a"),
+		MU8STRV("list/[..0]"),
+		MU8STRV("list/[1..]"),
+		MU8STRV("nested_lists/[]"),
+		MU8STRV("nested_lists/[0]"),
+		MU8STRV("nested_lists/[0]/[]"),
+		MU8STRV("nested_lists/[1]/[]"),
+		MU8STRV("nested_lists/[]/[1]"),
+		MU8STRV("nested_lists/[1]/[0]"),
+
+		// 错误路径（应报告错误）
+		MU8STRV("simple/[0]"),
+		MU8STRV("list/a"),
+		MU8STRV("list/[0]/a/extra"),
+		MU8STRV("\"bad\\escape\""),
+		MU8STRV("\"unclosed"),
+		MU8STRV("ab\"cd"),
+		MU8STRV("a//b"),
+		MU8STRV("list/[-1]"),
+		MU8STRV("list/[2]"),
+		MU8STRV("list/[1..0]"),
+		MU8STRV("list/[0..]extra"),
+		MU8STRV("\"weird/key/inner\""),
+
+		// 边界/特殊用例
+		MU8STRV("list"),
+		MU8STRV("empty"),
+		MU8STRV("\"empty\"/\"\""),
+		MU8STRV("\"list\""),
+		MU8STRV("list/[0]/"),
+	};
+
 	for (const auto &it : test_paths)
 	{
 		NbtPath path;
@@ -127,6 +128,30 @@ int main(void)
 			print("Unknown Exception\n");
 		}
 	}
+}
+
+
+int main(void)
+{
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 	return 0;
 }
