@@ -104,6 +104,61 @@ public:
 	using Step = std::variant<NameStep, IndexStep>;
 	using PathInfo = std::vector<Step>;
 
+	struct StepHash//透明哈希，允许使用非持有数据的类型进行等价哈希
+	{
+		using is_transparent = void;//透明标注类型
+
+		std::size_t operator()(const NameStep &ns) const noexcept
+		{
+			return ns.hash();
+		}
+		std::size_t operator()(const IndexStep &is) const noexcept
+		{
+			return is.hash();
+		}
+		std::size_t operator()(const Step &s) const noexcept
+		{
+			return std::visit([](const auto &v)
+				{
+					return v.hash();
+				}, s);
+		}
+	};
+
+	struct StepEqual//透明比较，允许使用非持有数据的类型进行等价比较
+	{
+		using is_transparent = void;//透明标注类型
+
+		// Step ↔ Step（默认 variant 相等）
+		bool operator()(const Step &lhs, const Step &rhs) const
+		{
+			return lhs == rhs;
+		}
+
+		// Step ↔ NameStep
+		bool operator()(const Step &s, const NameStep &ns) const
+		{
+			const auto *p = std::get_if<NameStep>(&s);
+			return p && *p == ns;
+		}
+		bool operator()(const NameStep &ns, const Step &s) const
+		{
+			return (*this)(s, ns);
+		}
+
+		// Step ↔ IndexStep
+		bool operator()(const Step &s, const IndexStep &is) const
+		{
+			const auto *p = std::get_if<IndexStep>(&s);
+			return p && *p == is;
+		}
+		bool operator()(const IndexStep &is, const Step &s) const
+		{
+			return (*this)(s, is);
+		}
+	};
+
+
 protected:
 	static size_t ParseNumber(const MUTF8_Char_Type *pBase, const NBT_Type::String::View &strNumber)
 	{
@@ -420,25 +475,27 @@ public:
 using EraseRequestList = std::vector<EraseRequest>;
 
 
-template<typename Key_Type, typename Val_Type>
+template<typename Key_Type, typename Val_Type, typename Hash_Type, typename Equal_Type>
 class TrieTree
 {
 public:
 	struct TrieNode
 	{
 	public:
-		using NodeChild_Type = std::unordered_map<Key_Type, TrieNode>;
+		using NodeChild_Type = std::unordered_map<Key_Type, TrieNode, Hash_Type, Equal_Type>;
 	public:
 		std::optional<Val_Type> nodeValue{};
 		NodeChild_Type nodeChild{};
 	public:
-		TrieNode *FindNext(const Key_Type &key)
+		template<typename T_Ky>
+		TrieNode *FindNext(const T_Ky &key)
 		{
 			auto it = nodeChild.find(key);
 			return it != nodeChild.end() ? &it->second : nullptr;
 		}
 
-		const TrieNode *FindNext(const Key_Type &key) const
+		template<typename T_Ky>
+		const TrieNode *FindNext(const T_Ky &key) const
 		{
 			auto it = nodeChild.find(key);
 			return it != nodeChild.end() ? &it->second : nullptr;
@@ -447,7 +504,7 @@ public:
 
 	class WalkContext
 	{
-		friend class TrieTree<Key_Type, Val_Type>;
+		friend class TrieTree<Key_Type, Val_Type, Hash_Type, Equal_Type>;
 	private:
 		const TrieNode *p{};
 
@@ -490,7 +547,7 @@ public:
 			return p != nullptr;
 		}
 
-		std::optional<Val_Type> GetValue(void) const
+		std::optional<Val_Type> &GetValue(void) const
 		{
 			return p->nodeValue;
 		}
@@ -500,7 +557,8 @@ public:
 			p = p->FindNext(key);
 		}
 
-		bool TryNext(const Key_Type &key)
+		template<typename T_Ky>
+		bool TryNext(const T_Ky &key)
 		{
 			const auto *tmp = p->FindNext(key);
 			if (tmp == nullptr)
@@ -635,19 +693,102 @@ public:
 };
 
 
+using NbtPathTrieTree = TrieTree<NbtPath::Step, EraseRequest::EraseMode, NbtPath::StepHash, NbtPath::StepEqual>;
+
 
 void NbtParseToErase(NBT_Type::Compound &cpd, const EraseRequestList &listEraseReq)
 {
-	TrieTree<NbtPath::Step, EraseRequest::EraseMode> tt;
+	//构造前缀树
+	NbtPathTrieTree tt;
 	for (const auto &[k, v] : listEraseReq)
 	{
 		tt.Insert(k, v);
 	}
+	//printf("%s\n", tt.ToString().c_str());
 
-	printf("%s\n", tt.ToString().c_str());
+
+
+
+
+
+
+
+
 
 	return;
 }
 
+
+void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx);
+void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx);
+
+void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
+{
+	switch (node.GetTag())
+	{
+	case NBT_TAG::Compound:
+		CompoundErase(node.GetCompound(), ctx);
+	case NBT_TAG::List:
+		ListErase(node.GetList(), ctx);
+
+	default:
+		break;
+	}
+
+
+}
+
+
+void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
+{
+	std::vector<NBT_Type::Compound::Iterator> remove;
+
+	for (auto it = cpd.begin(), end = cpd.end(); it != end; ++it)
+	{
+		auto &k = it->first;
+		auto &v = it->second;
+
+		auto ctxNext = ctx;//拷贝上下文
+		if (!ctxNext.TryNext(k))//尝试移动
+		{
+			continue;//失败跳过
+		}
+		//成功，检查是否有值，有值则操作，否则递归步入
+		auto &val = ctxNext.GetValue();
+		if (val.has_value())
+		{
+			switch (val.value())
+			{
+			case EraseRequest::EraseMode::CLEAR:
+				std::visit(
+				[&](const auto &v) -> void
+				{
+
+				}, v);
+				break;
+			case EraseRequest::EraseMode::REMOVE:
+				remove.push_back(it);
+				break;
+			default:
+				break;
+			}
+
+
+
+		}
+		else
+		{
+			EraseSwitch(v, ctxNext);
+		}
+	}
+
+	return;
+}
+
+void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx)
+{
+
+	return;
+}
 
 
