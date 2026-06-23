@@ -27,12 +27,28 @@ public:
 	struct NameStep
 	{
 		NBT_Type::String strStep = {};//默认空字符串
+
+	public:
+		size_t hash(void) const
+		{
+			return std::hash<NBT_Type::String>{}(strStep);
+		}
+
+		bool operator==(const NameStep &) const = default;
 	};
 
 	struct IndexStep//默认值为全覆盖
 	{
 		size_t szBeg = 0;
 		size_t szEnd = SIZE_MAX;
+
+	public:
+		size_t hash(void) const
+		{
+			return std::hash<size_t>{}(szBeg) ^ std::hash<size_t>{}(szEnd);
+		}
+
+		bool operator==(const IndexStep &) const = default;
 	};
 
 	enum class StepType : size_t
@@ -267,17 +283,10 @@ public:
 		return path;
 	}
 public:
-	PathInfo stPathInfo;
+	NbtPath(void) = delete;
+	~NbtPath(void) = delete;
 
-public:
-	NbtPath(const NBT_Type::String &strPath) : stPathInfo(PathParser(NBT_Type::String::View(strPath)))
-	{}
-	NbtPath(const NBT_Type::String::View &strvPath) : stPathInfo(PathParser(strvPath))
-	{}
-	NbtPath(void) = default;
-	~NbtPath(void) = default;
-
-	std::string Print(void) const
+	static std::string ToString(const PathInfo &stPathInfo)
 	{
 		std::string strRet;
 
@@ -346,6 +355,28 @@ public:
 
 };
 
+namespace std
+{
+	template<>
+	struct hash<NbtPath::NameStep>
+	{
+		size_t operator()(const NbtPath::NameStep &v) const noexcept
+		{
+			return v.hash();
+		}
+	};
+
+	template<>
+	struct hash<NbtPath::IndexStep>
+	{
+		size_t operator()(const NbtPath::IndexStep &v) const noexcept
+		{
+			return v.hash();
+		}
+	};
+};
+
+
 struct EraseRequest
 {
 public:
@@ -357,11 +388,11 @@ public:
 	};
 
 public:
-	NbtPath stNbtPath{};
+	NbtPath::PathInfo stNbtPath{};
 	EraseMode enMode = EraseMode::UNKNOWN;
 
 public:
-	std::string Print(void) const
+	std::string ToString(void) const
 	{
 		std::string strRet = "EraseMode: [";
 		switch (enMode)
@@ -378,32 +409,155 @@ public:
 			break;
 		}
 
-		strRet += std::format("Path: {}", stNbtPath.Print());
+		strRet += std::format("Path: {}", NbtPath::ToString(stNbtPath));
 		return strRet;
 	}
-
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 };
 
-using RequestList = std::vector<EraseRequest>;
+using EraseRequestList = std::vector<EraseRequest>;
+
+
+template<typename Key_Type, typename Val_Type>
+class TrieTree
+{
+public:
+	struct TrieNode
+	{
+	public:
+		using NodeChild_Type = std::unordered_map<Key_Type, TrieNode>;
+	public:
+		std::optional<Val_Type> nodeVal{};
+		NodeChild_Type nodeChild{};
+	public:
+		TrieNode *FindNext(const Key_Type &key)
+		{
+			auto it = nodeChild.find(key);
+			return it != nodeChild.end() ? &it->second : nullptr;
+		}
+
+		const TrieNode *FindNext(const Key_Type &key) const
+		{
+			auto it = nodeChild.find(key);
+			return it != nodeChild.end() ? &it->second : nullptr;
+		}
+	};
+
+	class WalkContext
+	{
+		friend class TrieTree<Key_Type, Val_Type>;
+	private:
+		const TrieNode *p{};
+
+	protected:
+		WalkContext(const TrieNode *_p) :p(_p)
+		{}
+	public:
+		WalkContext(const WalkContext &_Copy) :p(_Copy.p)
+		{}
+
+		WalkContext(WalkContext &&_Move) :p(_Move.p)
+		{
+			_Move.p = nullptr;
+		}
+
+		WalkContext &operator=(const WalkContext &_Copy)
+		{
+			p = _Copy.p;
+			return *this;
+		}
+		WalkContext &operator=(WalkContext &&_Move)
+		{
+			p = _Move.p;
+			_Move.p = nullptr;
+			return *this;
+		}
+
+		~WalkContext(void)
+		{
+			p = nullptr;
+		}
+
+		const TrieNode &GetCurNode(void) const
+		{
+			return *p;
+		}
+
+		operator bool() const
+		{
+			return p != nullptr;
+		}
+
+		void Next(const Key_Type &key)
+		{
+			p = p->FindNext(key);
+		}
+
+		bool TryNext(const Key_Type &key)
+		{
+			const auto *tmp = p->FindNext(key);
+			if (tmp == nullptr)
+			{
+				return false;
+			}
+
+			p = tmp;
+			return true;
+		}
+
+		bool HasNext(void) const
+		{
+			return !p->nodeChild.empty();
+		}
+	};
+
+protected:
+	TrieNode::NodeChild_Type root;
+
+public:
+	template<typename KeyList_Type>
+	requires(std::is_same_v<typename KeyList_Type::value_type, Key_Type>)
+	void Insert(const KeyList_Type &path, Val_Type val)
+	{
+		if (path.empty())
+		{
+			return;
+		}
+
+		TrieNode *pCur = &root[path[0]];//利用方括号副作用，如果不存在那么插入默认值
+		for (size_t i = 1, size = path.size(); i < size; ++i)
+		{
+			pCur = &pCur->nodeChild[path[i]];//利用方括号副作用，如果不存在那么插入默认值，同时遍历到指定节点
+		}
+
+		pCur->nodeVal = val;//插入值
+	}
+
+
+	WalkContext GetWalkContext(const Key_Type &key) const
+	{
+		auto it = root.find(key);
+		return WalkContext{ (it != root.end() ? &it->second : nullptr) };
+	}
+};
+
+
+
+void NbtParseToErase(NBT_Type::Compound &cpd, const EraseRequestList &listEraseReq)
+{
+	TrieTree<NbtPath::Step, EraseRequest::EraseMode> tt;
+	for (const auto &[k, v] : listEraseReq)
+	{
+		tt.Insert(k, v);
+	}
+
+
+
+
+
+
+
+	return;
+}
+
+
 

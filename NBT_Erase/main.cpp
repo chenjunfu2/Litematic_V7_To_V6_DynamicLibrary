@@ -106,12 +106,12 @@ void ParseTest(void)
 
 	for (const auto &it : test_paths)
 	{
-		NbtPath path;
+		NbtPath::PathInfo path;
 		try
 		{
 			print("Parse Path: {}\n", MU8CV2CTU8(it));
-			path.stPathInfo = NbtPath::PathParser(it);
-			print("Parse Success: {}\n\n", path.Print());
+			path = NbtPath::PathParser(it);
+			print("Parse Success: {}\n\n", NbtPath::ToString(path));
 		}
 		catch (const NbtPath::ParseError &e)
 		{
@@ -133,16 +133,8 @@ void ParseTest(void)
 
 int main(void)
 {
-	
-
-
-
-
-
-
-
-
-
+	NBT_Type::Compound cpd{};
+	NbtParseToErase(cpd, EraseRequestList{ EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")), .enMode = EraseRequest::EraseMode::REMOVE } });
 
 
 
