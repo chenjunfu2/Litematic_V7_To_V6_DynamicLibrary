@@ -134,16 +134,22 @@ void ParseTest(void)
 int main(void)
 {
 	NBT_Type::Compound cpd{};
-	NbtParseToErase(cpd, EraseRequestList{ EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")), .enMode = EraseRequest::EraseMode::REMOVE } });
-
-
-
-
-
-
-
-
-
+	EraseRequestList req
+	{
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/baz")),	.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo")),		.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[1..2]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("other/leaf")),			.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),	.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d")),				.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),				.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{ .stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = EraseRequest::EraseMode::REMOVE },
+	};
+	NbtParseToErase(cpd, req);
 
 	return 0;
 }

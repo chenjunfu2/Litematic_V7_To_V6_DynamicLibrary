@@ -4,6 +4,7 @@
 
 #include <charconv>
 #include <format>
+#include <functional>
 
 #define MU8CV2CTU8(mu8String) MUTF8_Tool<MUTF8_Char_Type, char16_t, char>::MU8ToU8(mu8String)
 
@@ -35,6 +36,27 @@ public:
 		}
 
 		bool operator==(const NameStep &) const = default;
+
+		std::string ToString(void) const
+		{
+			if (!strStep.empty() && strStep.find_first_of(MU8STR("/[]\"\\")) == strStep.npos)//普通字符且非空键名
+			{
+				return std::format("{}/", strStep.ToCharTypeUTF8());
+			}
+
+			//需要引号并添加转义
+			std::string newStr{};
+			for (const auto &ch : strStep)
+			{
+				if ((char)ch == '"' || (char)ch == '\\')
+				{
+					newStr.push_back((char)'\\');
+				}
+				newStr.push_back((char)ch);
+			}
+
+			return std::format("\"{}\"/", newStr);
+		}
 	};
 
 	struct IndexStep//默认值为全覆盖
@@ -49,6 +71,27 @@ public:
 		}
 
 		bool operator==(const IndexStep &) const = default;
+
+		std::string ToString(void) const
+		{
+			if (szBeg == szEnd)
+			{
+				return std::format("[{}]/", szBeg);
+			}
+			else
+			{
+				if (szBeg == 0 && szEnd == SIZE_MAX)
+				{
+					return std::string("[]/");
+				}
+				else
+				{
+					std::string strBeg = szBeg == 0 ? "" : std::format("{}", szBeg);
+					std::string strEnd = szEnd == SIZE_MAX ? "" : std::format("{}", szEnd);
+					return std::format("[{}..{}]/", strBeg, strEnd);
+				}
+			}
+		}
 	};
 
 	enum class StepType : size_t
@@ -298,50 +341,10 @@ public:
 				strRet += std::format("[[None Value]]");
 				break;
 			case NbtPath::StepType::Name:
-				{
-					const auto &tmp = std::get<NameStep>(it).strStep;
-					if (!tmp.empty() && tmp.find_first_of(MU8STR("/[]\"\\")) == tmp.npos)//普通字符且非空键名
-					{
-						strRet += std::format("{}/", tmp.ToCharTypeUTF8());
-						break;
-					}
-
-					//需要引号并添加转义
-					NBT_Type::String newStr{};
-					for (const auto &ch : tmp)
-					{
-						if (ch == '"' || ch == '\\')
-						{
-							newStr.push_back('\\');
-						}
-						newStr.push_back(ch);
-					}
-
-					strRet += std::format("\"{}\"/", newStr.ToCharTypeUTF8());
-				}
+				strRet += std::get<NameStep>(it).ToString();
 				break;
 			case NbtPath::StepType::Index:
-				{
-					const auto &tmp = std::get<IndexStep>(it);
-
-					if (tmp.szBeg == tmp.szEnd)
-					{
-						strRet += std::format("[{}]/", tmp.szBeg);
-					}
-					else
-					{
-						if (tmp.szBeg == 0 && tmp.szEnd == SIZE_MAX)
-						{
-							strRet += "[]/";
-						}
-						else
-						{
-							std::string strBeg = tmp.szBeg == 0 ? "" : std::format("{}", tmp.szBeg);
-							std::string strEnd = tmp.szEnd == SIZE_MAX ? "" : std::format("{}", tmp.szEnd);
-							strRet += std::format("[{}..{}]/", strBeg, strEnd);
-						}
-					}
-				}
+				strRet += std::get<IndexStep>(it).ToString();
 				break;
 			default:
 				strRet += std::format("[[Unknown Value]]");
@@ -426,7 +429,7 @@ public:
 	public:
 		using NodeChild_Type = std::unordered_map<Key_Type, TrieNode>;
 	public:
-		std::optional<Val_Type> nodeVal{};
+		std::optional<Val_Type> nodeValue{};
 		NodeChild_Type nodeChild{};
 	public:
 		TrieNode *FindNext(const Key_Type &key)
@@ -487,6 +490,11 @@ public:
 			return p != nullptr;
 		}
 
+		std::optional<Val_Type> GetValue(void) const
+		{
+			return p->nodeValue;
+		}
+
 		void Next(const Key_Type &key)
 		{
 			p = p->FindNext(key);
@@ -529,7 +537,7 @@ public:
 			pCur = &pCur->nodeChild[path[i]];//利用方括号副作用，如果不存在那么插入默认值，同时遍历到指定节点
 		}
 
-		pCur->nodeVal = val;//插入值
+		pCur->nodeValue = val;//插入值
 	}
 
 
@@ -537,6 +545,92 @@ public:
 	{
 		auto it = root.find(key);
 		return WalkContext{ (it != root.end() ? &it->second : nullptr) };
+	}
+
+	std::string ToString() const
+	{
+		auto key_to_str = [](const Key_Type &k) -> std::string
+		{
+			if constexpr (std::is_same_v<Key_Type, NbtPath::Step>)
+			{
+				switch (static_cast<NbtPath::StepType>(k.index()))
+				{
+				case NbtPath::StepType::Name:
+					return std::get<NbtPath::NameStep>(k).ToString();
+				case NbtPath::StepType::Index:
+					return std::get<NbtPath::IndexStep>(k).ToString();
+				default:
+					return "?";
+				}
+			}
+			else
+			{
+				return std::format("{}", k);
+			}
+		};
+
+		auto val_to_str = [](const std::optional<Val_Type> &v) -> std::string
+		{
+			if (!v.has_value()) return "";
+			if constexpr (std::is_same_v<Val_Type, EraseRequest::EraseMode>)
+			{
+				switch (v.value())
+				{
+				case EraseRequest::EraseMode::REMOVE:  return "REMOVE";
+				case EraseRequest::EraseMode::CLEAR:   return "CLEAR";
+				case EraseRequest::EraseMode::UNKNOWN: return "UNKNOWN";
+				default: return "?";
+				}
+			}
+			else
+			{
+				return std::format("{}", v.value());
+			}
+		};
+
+		std::function<void(std::string &, const std::string &, const std::string &, const TrieNode &)> dump_node;
+		dump_node = [&]
+		(
+			std::string &out,
+			const std::string &prefix,
+			const std::string &indent,
+			const TrieNode &node
+		)
+		{
+			if (node.nodeValue.has_value())
+			{
+				out += std::format(" ({})", val_to_str(node.nodeValue));
+			}
+			out += "\n";
+
+			if (node.nodeChild.empty()) return;
+
+			size_t idx = 0;
+			const size_t count = node.nodeChild.size();
+			for (const auto &[child_key, child_node] : node.nodeChild)
+			{
+				bool is_last = (++idx == count);
+				out += prefix;
+				out += (is_last ? "└── " : "├── ");
+				out += key_to_str(child_key);
+
+				std::string child_prefix = prefix + (is_last ? "    " : "│   ");
+				dump_node(out, child_prefix, indent, child_node);
+			}
+		};
+
+		std::string result = "(root)\n";
+		size_t idx = 0;
+		const size_t count = root.size();
+		for (const auto &[key, node] : root)
+		{
+			bool is_last = (++idx == count);
+			result += (is_last ? "└── " : "├── ");
+			result += key_to_str(key);
+			std::string child_prefix = (is_last ? "    " : "│   ");
+			dump_node(result, child_prefix, "", node);
+		}
+		return result;
 	}
 };
 
@@ -550,11 +644,7 @@ void NbtParseToErase(NBT_Type::Compound &cpd, const EraseRequestList &listEraseR
 		tt.Insert(k, v);
 	}
 
-
-
-
-
-
+	printf("%s\n", tt.ToString().c_str());
 
 	return;
 }
