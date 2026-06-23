@@ -112,13 +112,18 @@ public:
 		{
 			return ns.hash();
 		}
+		std::size_t operator()(const NBT_Type::String &s) const noexcept
+		{
+			return std::hash<NBT_Type::String>{}(s);
+		}
 		std::size_t operator()(const IndexStep &is) const noexcept
 		{
 			return is.hash();
 		}
 		std::size_t operator()(const Step &s) const noexcept
 		{
-			return std::visit([](const auto &v)
+			return std::visit(
+				[](const auto &v)
 				{
 					return v.hash();
 				}, s);
@@ -142,6 +147,17 @@ public:
 			return p && *p == ns;
 		}
 		bool operator()(const NameStep &ns, const Step &s) const
+		{
+			return (*this)(s, ns);
+		}
+
+		// Step ↔ NBT_String
+		bool operator()(const Step &s, const NBT_Type::String &ns) const
+		{
+			const auto *p = std::get_if<NameStep>(&s);
+			return p && p->strStep == ns;
+		}
+		bool operator()(const NBT_Type::String &ns, const Step &s) const
 		{
 			return (*this)(s, ns);
 		}
@@ -547,7 +563,7 @@ public:
 			return p != nullptr;
 		}
 
-		std::optional<Val_Type> &GetValue(void) const
+		const std::optional<Val_Type> &GetValue(void) const
 		{
 			return p->nodeValue;
 		}
@@ -728,14 +744,13 @@ void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
 	{
 	case NBT_TAG::Compound:
 		CompoundErase(node.GetCompound(), ctx);
+		break;
 	case NBT_TAG::List:
 		ListErase(node.GetList(), ctx);
-
-	default:
+		break;
+	default://路径不可达，忽略
 		break;
 	}
-
-
 }
 
 
@@ -761,10 +776,10 @@ void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 			{
 			case EraseRequest::EraseMode::CLEAR:
 				std::visit(
-				[&](const auto &v) -> void
+				[&](auto &v) -> void
 				{
-
-				}, v);
+					v = {};//重置为默认值
+				}, v.GetData());
 				break;
 			case EraseRequest::EraseMode::REMOVE:
 				remove.push_back(it);
@@ -772,9 +787,6 @@ void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 			default:
 				break;
 			}
-
-
-
 		}
 		else
 		{
@@ -782,11 +794,23 @@ void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 		}
 	}
 
+	auto &rawCpd = cpd.GetData();
+	for (auto &it : remove)
+	{
+		rawCpd.erase(it);
+	}
+
 	return;
 }
 
 void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx)
 {
+	std::vector<NBT_Type::List::Iterator> remove;
+
+	//对tree下一级进行完全展开，获取所有要处理的index，排序，并依次遍历处理
+
+
+
 
 	return;
 }
