@@ -527,16 +527,22 @@ public:
 	private:
 		const TrieNode *p{};
 
-	protected:
+	public:
 		WalkContext(const TrieNode *_p) :p(_p)
 		{}
-	public:
+
 		WalkContext(const WalkContext &_Copy) :p(_Copy.p)
 		{}
 
 		WalkContext(WalkContext &&_Move) :p(_Move.p)
 		{
 			_Move.p = nullptr;
+		}
+
+		WalkContext &operator=(const TrieNode *_p)
+		{
+			p = _p;
+			return *this;
 		}
 
 		WalkContext &operator=(const WalkContext &_Copy)
@@ -596,7 +602,7 @@ public:
 	};
 
 protected:
-	TrieNode::NodeChild_Type root;
+	TrieNode root;
 
 public:
 	template<typename KeyList_Type>
@@ -608,7 +614,7 @@ public:
 			return;
 		}
 
-		TrieNode *pCur = &root[path[0]];//利用方括号副作用，如果不存在那么插入默认值
+		TrieNode *pCur = &root.nodeChild[path[0]];//利用方括号副作用，如果不存在那么插入默认值
 		for (size_t i = 1, size = path.size(); i < size; ++i)
 		{
 			pCur = &pCur->nodeChild[path[i]];//利用方括号副作用，如果不存在那么插入默认值，同时遍历到指定节点
@@ -618,10 +624,9 @@ public:
 	}
 
 
-	WalkContext GetWalkContext(const Key_Type &key) const
+	WalkContext GetWalkContext() const
 	{
-		auto it = root.find(key);
-		return WalkContext{ (it != root.end() ? &it->second : nullptr) };
+		return WalkContext{ &root };
 	}
 
 	std::string ToString() const
@@ -698,8 +703,8 @@ public:
 
 		std::string result = "(root)\n";
 		size_t idx = 0;
-		const size_t count = root.size();
-		for (const auto &[key, node] : root)
+		const size_t count = root.nodeChild.size();
+		for (const auto &[key, node] : root.nodeChild)
 		{
 			bool is_last = (++idx == count);
 			result += (is_last ? "└── " : "├── ");
@@ -712,217 +717,224 @@ public:
 };
 
 
-using NbtPathTrieTree = TrieTree<NbtPath::Step, EraseRequest::EraseMode, NbtPath::StepHash, NbtPath::StepEqual>;
-
-
-void NbtParseToErase(NBT_Type::Compound &cpd, const EraseRequestList &listEraseReq)
-{
-	//构造前缀树
-	NbtPathTrieTree tt;
-	for (const auto &[k, v] : listEraseReq)
-	{
-		tt.Insert(k, v);
-	}
-	//printf("%s\n", tt.ToString().c_str());
-
-
-
-
-
-
-	return;
-}
-
-
-void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx);
-void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx);
-
-void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
-{
-	switch (node.GetTag())
-	{
-	case NBT_TAG::Compound:
-		CompoundErase(node.GetCompound(), ctx);
-		break;
-	case NBT_TAG::List:
-		ListErase(node.GetList(), ctx);
-		break;
-		//处理数组
-	case NBT_TAG::ByteArray:
-		ArrayErase(node.GetByteArray(), ctx);
-		break;
-	case NBT_TAG::IntArray:
-		ArrayErase(node.GetIntArray(), ctx);
-		break;
-	case NBT_TAG::LongArray:
-		ArrayErase(node.GetLongArray(), ctx);
-		break;
-	default://路径不可达，忽略
-		break;
-	}
-}
-
-class EraseError : public std::runtime_error
+class NBTErase
 {
 public:
-	EraseError(const char *message) :
-		std::runtime_error(message)
-	{}
+	using NbtPathTrieTree = TrieTree<NbtPath::Step, EraseRequest::EraseMode, NbtPath::StepHash, NbtPath::StepEqual>;
 
-	EraseError(const std::string &message) :
-		std::runtime_error(message)
-	{}
-};
-
-
-void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
-{
-	std::vector<NBT_Type::Compound::Iterator> remove;
-
-	for (const auto &[k, v] : ctx.GetCurNode().nodeChild)
+	class EraseError : public std::runtime_error
 	{
-		if (std::holds_alternative<NbtPath::IndexStep>(k))
-		{
-			//抛出异常，对compound进行index步
-			throw EraseError("");
-		}
-	}
+	public:
+		EraseError(const char *message) :
+			std::runtime_error(message)
+		{}
 
-	for (auto it = cpd.begin(), end = cpd.end(); it != end; ++it)
+		EraseError(const std::string &message) :
+			std::runtime_error(message)
+		{}
+	};
+
+public:
+	static void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 	{
-		auto &k = it->first;
-		auto &v = it->second;
-
-		auto ctxNext = ctx;//拷贝上下文
-		if (!ctxNext.TryNext(k))//尝试移动
+		auto &rawCpd = cpd.GetData();
+		for (const auto &[k, v] : ctx.GetCurNode().nodeChild)
 		{
-			continue;//失败跳过
-		}
-		//成功，检查是否有值，有值则操作，否则递归步入
-		auto &val = ctxNext.GetValue();
-		if (val.has_value())
-		{
-			switch (val.value())
+			auto p = std::get_if<NbtPath::NameStep>(&k);
+			if (p == nullptr)
 			{
-			case EraseRequest::EraseMode::CLEAR:
-				std::visit(
-				[&](auto &v) -> void
+				//抛出异常，对compound进行index步
+				throw EraseError("");
+			}
+
+			//在目标中查找
+			auto it = rawCpd.find(p->strStep);
+			if (it == rawCpd.end())
+			{
+				continue;
+			}
+
+			//找到了，检查是否有值，有值则操作，否则递归步入
+			auto ctxNext = NbtPathTrieTree::WalkContext{ &v };//切换上下文
+			auto &val = ctxNext.GetValue();
+			if (val.has_value())
+			{
+				switch (val.value())
 				{
-					v = {};//重置为默认值
-				}, v.GetData());
-				break;
-			case EraseRequest::EraseMode::REMOVE:
-				remove.push_back(it);
-				break;
-			default:
-				break;
+				case EraseRequest::EraseMode::CLEAR:
+					std::visit(
+						[&](auto &v) -> void
+						{
+							v = {};//重置为默认值
+						}, it->second.GetData());//重置值
+					break;
+				case EraseRequest::EraseMode::REMOVE:
+					rawCpd.erase(it);
+					break;
+				default:
+					break;
+				}
+			}
+			else
+			{
+				EraseSwitch(it->second, ctxNext);
 			}
 		}
-		else
-		{
-			EraseSwitch(v, ctxNext);
-		}
-	}
 
-	auto &rawCpd = cpd.GetData();
-	for (auto &it : remove)
-	{
-		rawCpd.erase(it);
-	}
-
-	return;
-}
-
-
-
-
-
-
-
-
-//改为模板，使用原始vector，array与list都在此处理
-void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx)
-{
-	//对tree进行完全展开，获取所有要处理的index，排序，并依次遍历处理
-	auto &node = ctx.GetCurNode();
-
-	//注意node不可能有值，因为有值的情况下已经在递归的父调用中处理了，当前是子调用
-	//首先进行排序
-	std::vector<NbtPath::IndexStep> listIdx;
-	for (const auto &[k, v] : node.nodeChild)
-	{
-		auto p = std::get_if<NbtPath::IndexStep>(&k);
-		if (p == nullptr)
-		{
-			//抛出异常，非法访问，list后不是index步
-			throw EraseError("");
-		}
-
-		listIdx.push_back(*p);
-	}
-
-	//验证完成后才进行空判断，以保证错误抛出
-	if (list.Empty())
-	{
 		return;
 	}
 
-	//倒排，从后往前处理的开销小于从前往后
-	std::ranges::sort(listIdx,
-		[](const NbtPath::IndexStep &l, const NbtPath::IndexStep &r) -> bool//返回true表示l排在r前
-		{
-			//beg与end相等的单一索引排在更前
-			if (l.szBeg == r.szBeg)//beg相等，排序end
-			{
-				//end小的在前面，小于等于使得l更优先
-				return l.szEnd >= r.szEnd;
-			}
-
-			return l.szBeg > r.szBeg;
-		}
-	);
-
-	//遍历列表处理，注意前面的空判断保证运行到此，列表至少有1元素，不为空
-	auto rawList = list.GetData();
-	size_t szListSize = rawList.size();
-	for (const auto &v : listIdx)
+	//改为模板，使用原始vector，array与list都在此处理
+	template<typename List_Raw>
+	static void GeneralListErase(List_Raw &rawList, const NbtPathTrieTree::WalkContext ctx)
 	{
-		auto ctxNext = ctx;//拷贝上下文
-		ctxNext.Next(v);//因为key是从map本身获取的，必然成功，不做判断
-		MyAssert(ctxNext, "ctxNext is nullptr WTF?");//拉点assert防止NPE
-
-		//处理上下界
-		size_t l = v.szBeg < szListSize ? v.szBeg : szListSize - 1;
-		size_t r = v.szEnd < szListSize ? v.szEnd : szListSize - 1;
-		++r;//上下界都可取到，让上界变为尾后位置
-
-		auto &val = ctxNext.GetValue();
-		if (val.has_value())
+		//对tree进行完全展开，获取所有要处理的index，排序，并依次遍历处理
+		//注意node不可能有值，因为有值的情况下已经在递归的父调用中处理了，当前是子调用
+		//首先进行排序
+		std::vector<NbtPath::IndexStep> listIdx;
+		for (const auto &[k, v] : ctx.GetCurNode().nodeChild)
 		{
-			switch (val.value())
+			auto p = std::get_if<NbtPath::IndexStep>(&k);
+			if (p == nullptr)
 			{
-			case EraseRequest::EraseMode::CLEAR:
-				for (size_t i = l; i < r; ++i)
+				//抛出异常，非法访问，list后不是index步
+				throw EraseError("");
+			}
+
+			listIdx.push_back(*p);
+		}
+
+		//验证完成后才进行空判断，以保证错误抛出
+		if (rawList.empty())
+		{
+			return;
+		}
+
+		//倒排，从后往前处理的开销小于从前往后，并且按顺序从后往前的情况下，删除最后的索引后，前面的索引不变，同时不再访问后续
+		std::ranges::sort(listIdx,
+			[](const NbtPath::IndexStep &l, const NbtPath::IndexStep &r) -> bool//返回true表示l排在r前
+			{
+				//beg与end相等的单一索引排在更前
+				if (l.szBeg == r.szBeg)//beg相等，排序end
 				{
-					rawList[i] = {};//设置为空
+					//end小的在前面，小于等于使得l更优先
+					return l.szEnd >= r.szEnd;
 				}
-				break;
-			case EraseRequest::EraseMode::REMOVE:
-				//范围删除
-				rawList.erase(rawList.begin() + l, rawList.begin() + r);
-				break;
-			default:
-				break;
+
+				return l.szBeg > r.szBeg;
+			}
+		);
+
+		//遍历列表处理，注意前面的空判断保证运行到此，列表至少有1元素，不为空
+		size_t szListSize = rawList.size();
+		for (const auto &v : listIdx)
+		{
+			//特判指定索引的情况，如果指定的索引超出范围，则跳过，其它范围情况溢出则锁定到上下界
+			if (v.szBeg == v.szEnd && v.szBeg >= szListSize)
+			{
+				continue;
+			}
+
+			auto ctxNext = ctx;//拷贝上下文
+			ctxNext.Next(v);//因为key是从map本身获取的，必然成功，不做判断
+			MyAssert(ctxNext, "ctxNext is nullptr WTF?");//拉点assert防止NPE
+
+			//处理上下界
+			size_t l = v.szBeg < szListSize ? v.szBeg : szListSize - 1;
+			size_t r = v.szEnd < szListSize ? v.szEnd : szListSize - 1;
+			++r;//上下界都可取到，让上界变为尾后位置
+
+			auto &val = ctxNext.GetValue();
+			if (val.has_value())
+			{
+				switch (val.value())
+				{
+				case EraseRequest::EraseMode::CLEAR:
+					for (size_t i = l; i < r; ++i)
+					{
+						rawList[i] = {};//设置为空
+					}
+					break;
+				case EraseRequest::EraseMode::REMOVE:
+					//范围删除
+					rawList.erase(rawList.begin() + l, rawList.begin() + r);
+					break;
+				default:
+					break;
+				}
+			}
+			else//递归处理
+			{
+				if constexpr (std::is_same_v<std::remove_cvref_t<decltype(rawList[0])>, NBT_Node>)//值必须是NBT_Node的才是列表，否则是数组
+				{
+					for (size_t i = l; i < r; ++i)//没有值，那么进入递归处理子序列
+					{
+						EraseSwitch(rawList[i], ctxNext);
+					}
+				}
+				else//非列表，无法递归处理，抛出异常
+				{
+					throw EraseError("");
+				}
 			}
 		}
-		else//递归处理
+
+		return;
+	}
+
+	static void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx)
+	{
+		GeneralListErase(list.GetData(), ctx);
+	}
+
+	template<typename Array_Type>
+	requires(NBT_Type::IsArrayType_V<Array_Type>)
+	static void ArrayErase(Array_Type &tArray, const NbtPathTrieTree::WalkContext ctx)
+	{
+		GeneralListErase(tArray, ctx);
+	}
+
+	static void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
+	{
+		switch (node.GetTag())
 		{
-			for (size_t i = l; i < r; ++i)//没有值，那么进入递归处理子序列
-			{
-				EraseSwitch(rawList[i], ctxNext);
-			}
+		case NBT_TAG::Compound:
+			CompoundErase(node.GetCompound(), ctx);
+			break;
+		case NBT_TAG::List:
+			ListErase(node.GetList(), ctx);
+			break;
+			//处理数组
+		case NBT_TAG::ByteArray:
+			ArrayErase(node.GetByteArray(), ctx);
+			break;
+		case NBT_TAG::IntArray:
+			ArrayErase(node.GetIntArray(), ctx);
+			break;
+		case NBT_TAG::LongArray:
+			ArrayErase(node.GetLongArray(), ctx);
+			break;
+		default://路径不可达，忽略
+			break;
 		}
 	}
 
-	return;
-}
+public:
+	static NbtPathTrieTree EraseRequest2NbtPathTrieTree(const EraseRequestList &listEraseReq)
+	{
+		//构造前缀树
+		NbtPathTrieTree tt;
+		for (const auto &[k, v] : listEraseReq)
+		{
+			tt.Insert(k, v);
+		}
+		return tt;
+	}
+
+
+	static void NbtParseToErase(NBT_Type::Compound &cpd, const NbtPathTrieTree& tt)
+	{
+		CompoundErase(cpd, tt.GetWalkContext());
+	}
+};
+
