@@ -1,10 +1,13 @@
 ﻿#pragma once
 
 #include <nbt_cpp/NBT_All.hpp>
+#include <util/MyAssert.hpp>
 
 #include <charconv>
 #include <format>
 #include <functional>
+#include <ranges>
+#include <algorithm>
 
 #define MU8CV2CTU8(mu8String) MUTF8_Tool<MUTF8_Char_Type, char16_t, char>::MU8ToU8(mu8String)
 
@@ -727,10 +730,6 @@ void NbtParseToErase(NBT_Type::Compound &cpd, const EraseRequestList &listEraseR
 
 
 
-
-
-
-
 	return;
 }
 
@@ -748,15 +747,46 @@ void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
 	case NBT_TAG::List:
 		ListErase(node.GetList(), ctx);
 		break;
+		//处理数组
+	case NBT_TAG::ByteArray:
+		ArrayErase(node.GetByteArray(), ctx);
+		break;
+	case NBT_TAG::IntArray:
+		ArrayErase(node.GetIntArray(), ctx);
+		break;
+	case NBT_TAG::LongArray:
+		ArrayErase(node.GetLongArray(), ctx);
+		break;
 	default://路径不可达，忽略
 		break;
 	}
 }
 
+class EraseError : public std::runtime_error
+{
+public:
+	EraseError(const char *message) :
+		std::runtime_error(message)
+	{}
+
+	EraseError(const std::string &message) :
+		std::runtime_error(message)
+	{}
+};
+
 
 void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 {
 	std::vector<NBT_Type::Compound::Iterator> remove;
+
+	for (const auto &[k, v] : ctx.GetCurNode().nodeChild)
+	{
+		if (std::holds_alternative<NbtPath::IndexStep>(k))
+		{
+			//抛出异常，对compound进行index步
+			throw EraseError("");
+		}
+	}
 
 	for (auto it = cpd.begin(), end = cpd.end(); it != end; ++it)
 	{
@@ -803,16 +833,96 @@ void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 	return;
 }
 
+
+
+
+
+
+
+
+//改为模板，使用原始vector，array与list都在此处理
 void ListErase(NBT_Type::List &list, const NbtPathTrieTree::WalkContext ctx)
 {
-	std::vector<NBT_Type::List::Iterator> remove;
+	//对tree进行完全展开，获取所有要处理的index，排序，并依次遍历处理
+	auto &node = ctx.GetCurNode();
 
-	//对tree下一级进行完全展开，获取所有要处理的index，排序，并依次遍历处理
+	//注意node不可能有值，因为有值的情况下已经在递归的父调用中处理了，当前是子调用
+	//首先进行排序
+	std::vector<NbtPath::IndexStep> listIdx;
+	for (const auto &[k, v] : node.nodeChild)
+	{
+		auto p = std::get_if<NbtPath::IndexStep>(&k);
+		if (p == nullptr)
+		{
+			//抛出异常，非法访问，list后不是index步
+			throw EraseError("");
+		}
 
+		listIdx.push_back(*p);
+	}
 
+	//验证完成后才进行空判断，以保证错误抛出
+	if (list.Empty())
+	{
+		return;
+	}
 
+	//倒排，从后往前处理的开销小于从前往后
+	std::ranges::sort(listIdx,
+		[](const NbtPath::IndexStep &l, const NbtPath::IndexStep &r) -> bool//返回true表示l排在r前
+		{
+			//beg与end相等的单一索引排在更前
+			if (l.szBeg == r.szBeg)//beg相等，排序end
+			{
+				//end小的在前面，小于等于使得l更优先
+				return l.szEnd >= r.szEnd;
+			}
+
+			return l.szBeg > r.szBeg;
+		}
+	);
+
+	//遍历列表处理，注意前面的空判断保证运行到此，列表至少有1元素，不为空
+	auto rawList = list.GetData();
+	size_t szListSize = rawList.size();
+	for (const auto &v : listIdx)
+	{
+		auto ctxNext = ctx;//拷贝上下文
+		ctxNext.Next(v);//因为key是从map本身获取的，必然成功，不做判断
+		MyAssert(ctxNext, "ctxNext is nullptr WTF?");//拉点assert防止NPE
+
+		//处理上下界
+		size_t l = v.szBeg < szListSize ? v.szBeg : szListSize - 1;
+		size_t r = v.szEnd < szListSize ? v.szEnd : szListSize - 1;
+		++r;//上下界都可取到，让上界变为尾后位置
+
+		auto &val = ctxNext.GetValue();
+		if (val.has_value())
+		{
+			switch (val.value())
+			{
+			case EraseRequest::EraseMode::CLEAR:
+				for (size_t i = l; i < r; ++i)
+				{
+					rawList[i] = {};//设置为空
+				}
+				break;
+			case EraseRequest::EraseMode::REMOVE:
+				//范围删除
+				rawList.erase(rawList.begin() + l, rawList.begin() + r);
+				break;
+			default:
+				break;
+			}
+		}
+		else//递归处理
+		{
+			for (size_t i = l; i < r; ++i)//没有值，那么进入递归处理子序列
+			{
+				EraseSwitch(rawList[i], ctxNext);
+			}
+		}
+	}
 
 	return;
 }
-
-
