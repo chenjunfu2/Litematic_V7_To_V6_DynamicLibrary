@@ -460,16 +460,17 @@ void TrieTreeTest(void)
 	{
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/baz")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo")),		.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo")),		.enMode = EraseRequest::EraseMode::CLEAR },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[1..2]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = EraseRequest::EraseMode::UNKNOWN },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("other/leaf")),			.enMode = EraseRequest::EraseMode::REMOVE },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = EraseRequest::EraseMode::UNKNOWN },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d")),				.enMode = EraseRequest::EraseMode::REMOVE },
 		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),				.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/[9..]")),			.enMode = EraseRequest::EraseMode::REMOVE },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = EraseRequest::EraseMode::CLEAR },
+		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = EraseRequest::EraseMode::CLEAR },
 	};
 
 	auto tt = NBTErase::EraseRequest2NbtPathTrieTree(req);
@@ -478,6 +479,7 @@ void TrieTreeTest(void)
 
 int main(void)
 {
+	TrieTreeTest();
 	testNbtErase();
 	testNbtErase2();
 
