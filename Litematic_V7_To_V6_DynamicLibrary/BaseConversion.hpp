@@ -12,7 +12,7 @@
 
 template<typename T, typename V>
 requires(std::is_same_v<std::decay_t<T>, std::decay_t<V>> || std::is_constructible_v<T, V>)
-T CopyOrElse(T *p, V &&d)
+T CopyOrElse(const T *p, V &&d)
 {
 	return p != NULL ? *p : std::forward<V>(d);
 }
@@ -116,12 +116,13 @@ NBT_Type::String ToJsonString(const NBT_Type::String &strRaw)
 
 	NBT_Type::String strJson{};
 	//预分配
-	strJson.reserve(sizeof(MU8STR("{\"text\":\"\"}")) + strTemp.size() * sizeof(*strTemp.data()));
+	constexpr size_t szBaseTextSize = MU8STRV("{\"text\":\"\"}").size();//MSVC在连续临时量求值发生崩溃，此处必须首先保存为constexpr
+	strJson.reserve(szBaseTextSize + strTemp.size() * sizeof(*strTemp.data()));//然后在下面进行求值
 
 	//拼接
-	strJson.append(MU8STR("{\"text\":\""));
+	strJson.append(MU8STRV("{\"text\":\""));
 	strJson.append(std::move(strTemp));
-	strJson.append(MU8STR("\"}"));
+	strJson.append(MU8STRV("\"}"));
 
 	//返回转义完成的字符串
 	return strJson;

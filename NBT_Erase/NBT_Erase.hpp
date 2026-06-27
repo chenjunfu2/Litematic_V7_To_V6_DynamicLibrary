@@ -717,6 +717,13 @@ public:
 };
 
 
+
+class NBT_Erase_Visitor : public NBT_Visitor
+{
+
+};
+
+
 class NBTErase
 {
 public:
