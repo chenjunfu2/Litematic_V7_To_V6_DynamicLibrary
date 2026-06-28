@@ -564,6 +564,7 @@ void testNbtErase3()
 
 		MyAssert(try_remove == root);
 	}
+
 	{
 		NBT_Type::Compound try_remove = root;
 		NBTErase::RequestList req

@@ -630,14 +630,15 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 					try
 					{
-						NBTErase::Request reqNew = { NbtPath::PathParser(NBT_Type::String::View{ (MUTF8_Char_Type *)&iptStream.Index(), (size_t)u16StrSize }), (NBTErase::Request::EraseMode)u8Mode };
+						NBT_Type::String::View curPath{ (MUTF8_Char_Type *)&iptStream[iptStream.Index()], (size_t)u16StrSize };
 						iptStream.SkipData(u16StrSize);
 
+						NBTErase::Request reqNew = { NbtPath::PathParser(curPath), (NBTErase::Request::EraseMode)u8Mode };
 						requests.push_back(std::move(reqNew));
 					}
 					catch (const NbtPath::ParseError &e)
 					{
-						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: NBT path parse error: {}, in position: {}", e.what(), e.position).c_str(), nullptr);
+						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: NBT path parse error: {}", e.what()).c_str(), nullptr);
 					}
 				}
 
