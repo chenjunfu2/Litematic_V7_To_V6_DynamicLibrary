@@ -533,6 +533,68 @@ void testNbtErase2()
 	print("All extended tests passed!\n");
 }
 
+void testNbtErase3()
+{
+	NBT_Type::Compound root
+	{
+		{MU8STR(""), NBT_Type::Compound
+		{
+			{MU8STR("Regions"), NBT_Type::Compound
+			{
+				{MU8STR("Unnamed"), NBT_Type::Compound
+				{
+					{MU8STR("Entities"), NBT_Type::List
+					{
+						NBT_Type::Compound{{MU8STR("Removed"), NBT_Type::Int(0)}},
+						NBT_Type::Compound{{MU8STR("Removed"), NBT_Type::Int(1)}},
+						NBT_Type::Compound{{MU8STR("Removed"), NBT_Type::Int(2)}},
+					}},
+				}},
+			}},
+		}},
+	};
+
+	{
+		NBT_Type::Compound try_remove = root;
+		NBTErase::RequestList req
+		{
+			NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("Regions/*/Entities")),	.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
+		};
+		NBTErase::NbtParseToErase(try_remove, NBTErase::EraseRequest2NbtPathTrieTree(req));
+
+		MyAssert(try_remove == root);
+	}
+	{
+		NBT_Type::Compound try_remove = root;
+		NBTErase::RequestList req
+		{
+			NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("*/Regions/*/Entities")),	.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
+		};
+		NBTErase::NbtParseToErase(try_remove, NBTErase::EraseRequest2NbtPathTrieTree(req));
+
+		NBT_Type::Compound root2
+		{
+			{MU8STR(""), NBT_Type::Compound
+			{
+				{MU8STR("Regions"), NBT_Type::Compound
+				{
+					{MU8STR("Unnamed"), NBT_Type::Compound
+					{
+						{MU8STR("Entities"), NBT_Type::List
+						{
+						}},
+					}},
+				}},
+			}},
+		};
+
+		MyAssert(try_remove != root);
+		MyAssert(try_remove == root2);
+	}
+
+	print("All extended2 tests passed!\n");
+}
+
 void TrieTreeTest(void)
 {
 	NBTErase::RequestList req
@@ -543,10 +605,10 @@ void TrieTreeTest(void)
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[1..2]/foo/bar")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = NBTErase::NBTErase::Request::EraseMode::UNKNOWN },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("other/leaf")),			.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
-		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
-		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = NBTErase::NBTErase::Request::EraseMode::UNKNOWN },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),		.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),				.enMode = NBTErase::NBTErase::Request::EraseMode::UNKNOWN },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d")),				.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
-		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),				.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),					.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/[9..]")),			.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
 		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
@@ -562,6 +624,7 @@ int main(void)
 	TrieTreeTest();
 	testNbtErase();
 	testNbtErase2();
+	testNbtErase3();
 
 	return 0;
 }
