@@ -693,8 +693,8 @@ public:
 	public:
 		enum class EraseMode : uint8_t
 		{
-			REMOVE,
 			CLEAR,
+			REMOVE,
 			UNKNOWN,
 		};
 

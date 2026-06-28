@@ -68,6 +68,9 @@
     <ClInclude Include="LitematicConversion.hpp">
       <Filter>头文件\LitematicConversion</Filter>
     </ClInclude>
+    <ClInclude Include="NBT_Erase.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt">

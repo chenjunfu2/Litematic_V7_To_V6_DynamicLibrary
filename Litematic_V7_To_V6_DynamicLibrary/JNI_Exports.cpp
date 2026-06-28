@@ -1,4 +1,5 @@
 ﻿#include "LitematicConversion.hpp"
+#include "NBT_Erase.hpp"
 
 #include <stdexcept>
 #include <format>
@@ -510,7 +511,7 @@ ops[i]为第i个对nbtData数据进行的操作
 paramBlocks[i]的i与前相同，为第i个对nbtData数据进行操作时需要用到的额外参数获取方式
 [paramData[paramBlocks[i] >> 32] , paramData[paramBlocks[i] >> 32 + paramBlocks[i] & 0xFFFFFFFFL])为对第i个对nbtData数据进行操作时需要用到的额外参数
 */
-extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeExecute(JNIEnv *env, [[maybe_unused]] jclass clazz, jbyteArray nbtData, jintArray ops, jlongArray paramBlocks, jbyteArray paramData)
+extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeExecute(JNIEnv *env, [[maybe_unused]] jclass clazz, jbyteArray nbtData, jintArray ops, jlongArray paramBlocks, jbyteArray paramData) try
 {
 	if (nbtData == nullptr || ops == nullptr || paramBlocks == nullptr || paramData == nullptr)
 	{
@@ -575,10 +576,81 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 			break;
 		case JNI_Operator::ERASE_FIELDS:
 			{
-				//针对小于n个删除路径的优化（直接查找删除），大于n个则构建前缀树
+				if (arrParamBlocks[i] == (jlong)0)//必须有参数
+				{
+					ThrowJavaException("java/lang/IllegalArgumentException", std::format("Operation ERASE_FIELDS expects parameters, but paramBlocks[{}] = {} is bad", i, arrParamBlocks[i]).c_str(), nullptr);
+				}
 
+				//解析高字节（偏移）低字节（长度）
+				uint32_t u32BaseIndex = (uint64_t)arrParamBlocks[i] >> 32 & 0x00'00'00'00'FF'FF'FF'FFL;
+				uint32_t u32DataSize = (uint64_t)arrParamBlocks[i] >> 0 & 0x00'00'00'00'FF'FF'FF'FFL;
 
+				//io流
+				std::vector<uint8_t> data{};
+				data.resize(u32DataSize);
+				memcpy(data.data(), &arrParamData.buffer[u32BaseIndex], u32DataSize);
+				NBT_IO::DefaultInputStream<std::vector<uint8_t>> iptStream(data);
 
+				//字节序
+				uint32_t u32MapSize = 0;
+
+				if (!iptStream.HasAvailData(sizeof(u32MapSize)))
+				{
+					ThrowJavaException("java/lang/IllegalArgumentException", "ERASE_FIELDS: param data too short, cannot read map size", nullptr);
+				}
+
+				iptStream.GetRange(&u32MapSize, sizeof(u32MapSize));
+				u32MapSize = NBT_Endian::BigToNativeAny(u32MapSize);
+
+				//接下来是1字节模式，2字节长度与字符串的循环，前面的size代表循环有多少个
+				NBTErase::RequestList requests{};
+				for (uint32_t i = 0; i < u32MapSize; ++i)
+				{
+					uint8_t u8Mode = 0;
+					uint16_t u16StrSize = 0;
+
+					if (!iptStream.HasAvailData(sizeof(u8Mode) + sizeof(u16StrSize)))
+					{
+						ThrowJavaException("java/lang/IllegalArgumentException", "ERASE_FIELDS: param data too short, cannot read erase mode and path length", nullptr);
+					}
+
+					iptStream.GetRange(&u8Mode, sizeof(u8Mode));
+					iptStream.GetRange(&u16StrSize, sizeof(u16StrSize));
+					u16StrSize = NBT_Endian::BigToNativeAny(u16StrSize);
+
+					if (u8Mode > 1)//只能是0和1
+					{
+						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: invalid erase mode {}, expected 0 (CLEAR) or 1 (REMOVE)", u8Mode).c_str(), nullptr);
+					}
+
+					if (!iptStream.HasAvailData(u16StrSize))
+					{
+						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: param data too short, expected {} bytes for path name", u16StrSize).c_str(), nullptr);
+					}
+
+					try
+					{
+						NBTErase::Request reqNew = { NbtPath::PathParser(NBT_Type::String::View{ (MUTF8_Char_Type *)&iptStream.Index(), (size_t)u16StrSize }), (NBTErase::Request::EraseMode)u8Mode };
+						iptStream.SkipData(u16StrSize);
+
+						requests.push_back(std::move(reqNew));
+					}
+					catch (const NbtPath::ParseError &e)
+					{
+						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: NBT path parse error: {}, in position: {}", e.what(), e.position).c_str(), nullptr);
+					}
+				}
+
+				//路径解析处理完成，进行建树后删除
+				try
+				{
+					auto pathTrieTree = NBTErase::EraseRequest2NbtPathTrieTree(requests);
+					NBTErase::NbtParseToErase(cpdNBTData, pathTrieTree);
+				}
+				catch (const NBTErase::EraseError &e)
+				{
+					ThrowJavaException("java/lang/IllegalStateException", std::format("ERASE_FIELDS: NBT erase execution error: {}", e.what()).c_str(), nullptr);
+				}
 			}
 			break;
 		case JNI_Operator::UNKNOWN:
@@ -611,4 +683,12 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 	
 	// 返回结果
 	return outputStream.ToJByteArray();
+}
+catch (std::exception &e)
+{
+	ThrowJavaException("java/lang/RuntimeException", std::format("Unexpected native C++ exception: {}", e.what()).c_str(), nullptr);
+}
+catch (...)
+{
+	ThrowJavaException("java/lang/RuntimeException", "Unknown native C++ exception occurred", nullptr);
 }

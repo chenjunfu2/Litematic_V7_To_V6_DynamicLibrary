@@ -339,6 +339,7 @@
     <ClInclude Include="jni\x64\include\jni_md.h" />
     <ClInclude Include="LitematicConversion.hpp" />
     <ClInclude Include="Mappings.hpp" />
+    <ClInclude Include="NBT_Erase.hpp" />
     <ClInclude Include="RegionConversion.hpp" />
     <ClInclude Include="TileEntityConversion.hpp" />
   </ItemGroup>
