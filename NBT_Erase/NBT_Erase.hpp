@@ -131,7 +131,7 @@ public:
 
 	enum class StepType : size_t
 	{
-		NONE = -1,
+		NONE = SIZE_MAX,
 		Name = 0,
 		Index = 1,
 	};
@@ -693,8 +693,8 @@ public:
 	public:
 		enum class EraseMode : uint8_t
 		{
-			REMOVE,
 			CLEAR,
+			REMOVE,
 			UNKNOWN,
 		};
 
