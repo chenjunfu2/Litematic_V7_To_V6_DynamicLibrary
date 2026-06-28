@@ -81,11 +81,15 @@ void ParseTest(void)
 		MU8STRV("nested_lists/[1]/[]"),
 		MU8STRV("nested_lists/[]/[1]"),
 		MU8STRV("nested_lists/[1]/[0]"),
-
-		// 错误路径（应报告错误）
+		MU8STRV("group/\"*\"/\"*\""),
 		MU8STRV("simple/[0]"),
 		MU8STRV("list/a"),
-		MU8STRV("list/[0]/a/extra"),
+		MU8STRV("list/[0]/*/extra"),
+		MU8STRV("\"weird/key/inner\""),
+
+		// 错误路径（应报告错误）
+		MU8STRV("no\"\"/\"*"),
+		MU8STRV("nono\"*/\"/"),
 		MU8STRV("\"bad\\escape\""),
 		MU8STRV("\"unclosed"),
 		MU8STRV("ab\"cd"),
@@ -94,14 +98,29 @@ void ParseTest(void)
 		MU8STRV("list/[2]"),
 		MU8STRV("list/[1..0]"),
 		MU8STRV("list/[0..]extra"),
-		MU8STRV("\"weird/key/inner\""),
+		MU8STRV("*a"),
+		MU8STRV("a/b*/c"),
+		MU8STRV("a/*b"),
+		MU8STRV("foo/[*]"),
+		MU8STRV("list/[0]/"),
+		MU8STRV("/*"),
+		MU8STRV("/"),
+		MU8STRV("*/"),
+		
 
 		// 边界/特殊用例
 		MU8STRV("list"),
 		MU8STRV("empty"),
 		MU8STRV("\"empty\"/\"\""),
 		MU8STRV("\"list\""),
-		MU8STRV("list/[0]/"),
+		MU8STRV("*"),
+		MU8STRV("\"*\""),
+		MU8STRV("\"*\"/*/\"*\"/*"),
+		MU8STRV("*/*/*/*"),
+		MU8STRV("*/foo"),
+		MU8STRV("group/*/val"),
+		MU8STRV("group/*"),
+		MU8STRV("\"star_key\"/\"*\""),
 	};
 
 	for (const auto &it : test_paths)
@@ -255,6 +274,37 @@ void testNbtErase2()
 		root.PutCompound(MU8STR("Coordinates"), std::move(inner));
 	}
 
+	// -- 通配符测试 --
+	{
+		NBT_Type::Compound group;
+		group.PutInt(MU8STR("alpha"), 10);
+		group.PutInt(MU8STR("beta"), 20);
+		group.PutString(MU8STR("gamma"), MU8STR("hello"));
+		root.PutCompound(MU8STR("group"), std::move(group));
+	}
+
+	{
+		NBT_Type::Compound region;
+		// 第一个子区域
+		NBT_Type::Compound chunk1;
+		chunk1.PutString(MU8STR("entity"), MU8STR("zombie"));
+		chunk1.PutString(MU8STR("block"), MU8STR("stone"));
+		region.PutCompound(MU8STR("chunk_1"), std::move(chunk1));
+
+		// 第二个子区域
+		NBT_Type::Compound chunk2;
+		chunk2.PutString(MU8STR("entity"), MU8STR("skeleton"));
+		chunk2.PutString(MU8STR("block"), MU8STR("dirt"));
+		region.PutCompound(MU8STR("chunk_2"), std::move(chunk2));
+
+		// 第三个子区域（没有 entity，用来验证不会误删）
+		NBT_Type::Compound chunk3;
+		chunk3.PutString(MU8STR("block"), MU8STR("sand"));
+		region.PutCompound(MU8STR("chunk_3"), std::move(chunk3));
+
+		root.PutCompound(MU8STR("region"), std::move(region));
+	}
+
 	// -- Enchantments 列表（每个元素为复合标签） --
 	NBT_Type::List enchantments;
 	{
@@ -341,6 +391,8 @@ void testNbtErase2()
 		{ NbtPath::PathParser(MU8STRV("L1/L2/value")),   NBTErase::Request::EraseMode::CLEAR  },
 		{ NbtPath::PathParser(MU8STRV("NoSuchPath")),     NBTErase::Request::EraseMode::REMOVE },
 		{ NbtPath::PathParser(MU8STRV("Enchantments/[10]/id")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("group/*")), NBTErase::Request::EraseMode::CLEAR },
+		{ NbtPath::PathParser(MU8STRV("region/*/entity")), NBTErase::Request::EraseMode::REMOVE },
 	};
 
 	// ================================================================
@@ -451,6 +503,33 @@ void testNbtErase2()
 	MyAssert(pVal != nullptr, "L2/value should still exist");
 	MyAssert(*pVal == 0, "L2/value should be 0, got %d", *pVal);
 
+	// 13. 通配符删除验证
+	const auto &grp = root.GetCompound(MU8STR("group"));
+	MyAssert(grp.HasInt(MU8STR("alpha")) != nullptr && *grp.HasInt(MU8STR("alpha")) == 0);
+	MyAssert(grp.HasInt(MU8STR("beta")) != nullptr && *grp.HasInt(MU8STR("beta")) == 0);
+	auto *gamma = grp.HasString(MU8STR("gamma"));
+	MyAssert(gamma != nullptr && gamma->empty());
+
+	// 14. 通配符验证2
+	const auto &region = root.GetCompound(MU8STR("region"));
+	// chunk_1: entity 被删除，block 仍存在
+	const auto &c1 = region.GetCompound(MU8STR("chunk_1"));
+	MyAssert(c1.HasString(MU8STR("entity")) == nullptr, "chunk_1/entity should be removed");
+	auto *b1 = c1.HasString(MU8STR("block"));
+	MyAssert(b1 != nullptr && *b1 == MU8STR("stone"), "chunk_1/block should be 'stone'");
+
+	// chunk_2: entity 被删除，block 仍存在
+	const auto &c2 = region.GetCompound(MU8STR("chunk_2"));
+	MyAssert(c2.HasString(MU8STR("entity")) == nullptr, "chunk_2/entity should be removed");
+	auto *b2 = c2.HasString(MU8STR("block"));
+	MyAssert(b2 != nullptr && *b2 == MU8STR("dirt"), "chunk_2/block should be 'dirt'");
+
+	// chunk_3: 本来就没有 entity，block 不受影响
+	const auto &c3 = region.GetCompound(MU8STR("chunk_3"));
+	MyAssert(c3.HasString(MU8STR("entity")) == nullptr, "chunk_3/entity should not exist");
+	auto *b3 = c3.HasString(MU8STR("block"));
+	MyAssert(b3 != nullptr && *b3 == MU8STR("sand"), "chunk_3/block should be 'sand'");
+
 	print("All extended tests passed!\n");
 }
 
@@ -479,6 +558,7 @@ void TrieTreeTest(void)
 
 int main(void)
 {
+	ParseTest();
 	TrieTreeTest();
 	testNbtErase();
 	testNbtErase2();

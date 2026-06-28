@@ -8,6 +8,7 @@
 #include <functional>
 #include <ranges>
 #include <algorithm>
+#include <type_traits>
 
 #define MU8CV2CTU8(mu8String) MUTF8_Tool<MUTF8_Char_Type, char16_t, char>::MU8ToU8(mu8String)
 
@@ -37,6 +38,27 @@ public:
 		NBT_Type::String strStep = {};//默认空字符串
 
 	public:
+		void SetWildcard(void)
+		{
+			strStep.clear();
+			strStep.push_back('\0');
+			strStep.push_back('*');
+		}
+
+		static NBT_Type::String MakeWildcardString(void)
+		{
+			NBT_Type::String ret;
+			ret.push_back('\0');
+			ret.push_back('*');
+			return ret;
+		}
+
+		bool IsWildcard(void) const
+		{
+			return strStep.size() == 2 && strStep[0] == '\0' && strStep[1] == '*';
+		}
+
+	public:
 		size_t hash(void) const
 		{
 			return std::hash<NBT_Type::String>{}(strStep);
@@ -46,9 +68,15 @@ public:
 
 		std::string ToString(void) const
 		{
-			if (!strStep.empty() && strStep.find_first_of(MU8STR("/[]\"\\")) == strStep.npos)//普通字符且非空键名
+			if (!strStep.empty() && strStep.find_first_of(MU8STR("/[]\"\\*")) == strStep.npos)//普通字符且非空键名
 			{
 				return std::format("{}/", strStep.ToCharTypeUTF8());
+			}
+
+			//确定是否是通配符
+			if (IsWildcard())
+			{
+				return std::string("*/");
 			}
 
 			//需要引号并添加转义
@@ -291,11 +319,19 @@ protected:
 		}
 
 		NameStep stepName{ .strStep = strPath.substr(0, szEndPos) };
-		size_t szErrCharPos = stepName.strStep.find_first_of(MU8STR("[]\"\\"));//如果出现其它异常字符则出错
-		if (szErrCharPos != stepName.strStep.npos)
+		if (stepName.strStep.size() == 1 && stepName.strStep[0] == '*')
 		{
-			throw ParseError(std::format("Invalid character '{}' in plain name", (char)stepName.strStep[szErrCharPos]), strPath.data() - pBase + szErrCharPos);
+			stepName.SetWildcard();//通配符处理
 		}
+		else
+		{
+			size_t szErrCharPos = stepName.strStep.find_first_of(MU8STR("[]\"\\*"));//如果出现其它异常字符则出错
+			if (szErrCharPos != stepName.strStep.npos)
+			{
+				throw ParseError(std::format("Invalid character '{}' in plain name", (char)stepName.strStep[szErrCharPos]), strPath.data() - pBase + szErrCharPos);
+			}
+		}
+		
 
 		//删除
 		strPath.remove_prefix(szEndPos);
@@ -593,15 +629,9 @@ public:
 		auto val_to_str = [](const std::optional<Val_Type> &v) -> std::string
 		{
 			if (!v.has_value()) return "";
-			if constexpr (std::is_same_v<Val_Type, Request::EraseMode>)
+			if constexpr (std::is_enum_v<Val_Type>)
 			{
-				switch (v.value())
-				{
-				case Request::EraseMode::REMOVE:  return "REMOVE";
-				case Request::EraseMode::CLEAR:   return "CLEAR";
-				case Request::EraseMode::UNKNOWN: return "UNKNOWN";
-				default: return "?";
-				}
+				return std::format("{}", (std::underlying_type_t<Val_Type>)v.value());
 			}
 			else
 			{
@@ -715,6 +745,47 @@ public:
 	static void CompoundErase(NBT_Type::Compound &cpd, NbtPathTrieTree::WalkContext ctx)
 	{
 		auto &rawCpd = cpd.GetData();
+
+		static const NBT_String strWildcard = NbtPath::NameStep::MakeWildcardString();
+
+		//只要包含通配符，那么所有其它同级的都无意义，直接遍历全部并处理
+		if (auto wc = ctx.GetCurNode().nodeChild.find(strWildcard); wc != ctx.GetCurNode().nodeChild.end())
+		{
+			//区分两种情况，如果没有值，那么遍历当前级别并深入，否则直接清空当前级
+			auto ctxNext = NbtPathTrieTree::WalkContext{ &wc->second };//切换上下文
+			auto &val = ctxNext.GetValue();
+			if (val.has_value())
+			{
+				switch (val.value())
+				{
+				case Request::EraseMode::CLEAR:
+					for (auto &[k, v] : rawCpd)
+					{
+						std::visit(
+							[&](auto &v) -> void
+							{
+								v = {};//重置为默认值
+							}, v.GetData());//重置值
+					}
+					break;
+				case Request::EraseMode::REMOVE:
+					rawCpd.clear();//remove所有相当于清空当前容器
+					break;
+				default:
+					break;
+				}
+			}
+			else
+			{
+				for (auto &[k, v] : rawCpd)
+				{
+					EraseSwitch(v, ctxNext);
+				}
+			}
+
+			return;//完成返回
+		}
+
 		for (const auto &[k, v] : ctx.GetCurNode().nodeChild)
 		{
 			auto p = std::get_if<NbtPath::NameStep>(&k);
