@@ -604,7 +604,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 				//接下来是1字节模式，2字节长度与字符串的循环，前面的size代表循环有多少个
 				NBTErase::RequestList requests{};
-				for (uint32_t i = 0; i < u32MapSize; ++i)
+				for (uint32_t reqIdx = 0; reqIdx < u32MapSize; ++reqIdx)
 				{
 					uint8_t u8Mode = 0;
 					uint16_t u16StrSize = 0;
@@ -638,7 +638,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 					}
 					catch (const NbtPath::ParseError &e)
 					{
-						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: NBT path parse error: {}", e.what()).c_str(), nullptr);
+						ThrowJavaException("java/lang/IllegalArgumentException", std::format("ERASE_FIELDS: NBT path parse error at request index {}: {}", reqIdx, e.what()).c_str(), nullptr);
 					}
 				}
 
