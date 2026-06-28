@@ -13,6 +13,9 @@
 
 struct NbtPath
 {
+	NbtPath(void) = delete;
+	~NbtPath(void) = delete;
+
 public:
 	class ParseError : public std::runtime_error
 	{
@@ -28,6 +31,7 @@ public:
 		{}
 	};
 
+public:
 	struct NameStep
 	{
 		NBT_Type::String strStep = {};//默认空字符串
@@ -105,7 +109,6 @@ public:
 	};
 
 	using Step = std::variant<NameStep, IndexStep>;
-	using PathInfo = std::vector<Step>;
 
 	struct StepHash//透明哈希，允许使用非持有数据的类型进行等价哈希
 	{
@@ -176,7 +179,6 @@ public:
 			return (*this)(s, is);
 		}
 	};
-
 
 protected:
 	static size_t ParseNumber(const MUTF8_Char_Type *pBase, const NBT_Type::String::View &strNumber)
@@ -350,6 +352,8 @@ protected:
 	}
 
 public:
+	using PathInfo = std::vector<Step>;
+
 	static PathInfo PathParser(NBT_Type::String::View strPath)
 	{
 		if (strPath.empty())
@@ -399,11 +403,8 @@ public:
 
 		return path;
 	}
-public:
-	NbtPath(void) = delete;
-	~NbtPath(void) = delete;
 
-	static std::string ToString(const PathInfo &stPathInfo)
+	static std::string PathToString(const PathInfo &stPathInfo)
 	{
 		std::string strRet;
 
@@ -431,68 +432,6 @@ public:
 	}
 
 };
-
-namespace std
-{
-	template<>
-	struct hash<NbtPath::NameStep>
-	{
-		size_t operator()(const NbtPath::NameStep &v) const noexcept
-		{
-			return v.hash();
-		}
-	};
-
-	template<>
-	struct hash<NbtPath::IndexStep>
-	{
-		size_t operator()(const NbtPath::IndexStep &v) const noexcept
-		{
-			return v.hash();
-		}
-	};
-};
-
-
-struct EraseRequest
-{
-public:
-	enum class EraseMode : uint8_t
-	{
-		REMOVE,
-		CLEAR,
-		UNKNOWN,
-	};
-
-public:
-	NbtPath::PathInfo stNbtPath{};
-	EraseMode enMode = EraseMode::UNKNOWN;
-
-public:
-	std::string ToString(void) const
-	{
-		std::string strRet = "EraseMode: [";
-		switch (enMode)
-		{
-		case EraseRequest::EraseMode::REMOVE:
-			strRet += "REMOVE] ";
-			break;
-		case EraseRequest::EraseMode::CLEAR:
-			strRet += "CLEAR] ";
-			break;
-		case EraseRequest::EraseMode::UNKNOWN:
-		default:
-			strRet += "UNKNOWN] ";
-			break;
-		}
-
-		strRet += std::format("Path: {}", NbtPath::ToString(stNbtPath));
-		return strRet;
-	}
-};
-
-using EraseRequestList = std::vector<EraseRequest>;
-
 
 template<typename Key_Type, typename Val_Type, typename Hash_Type, typename Equal_Type>
 class TrieTree
@@ -654,13 +593,13 @@ public:
 		auto val_to_str = [](const std::optional<Val_Type> &v) -> std::string
 		{
 			if (!v.has_value()) return "";
-			if constexpr (std::is_same_v<Val_Type, EraseRequest::EraseMode>)
+			if constexpr (std::is_same_v<Val_Type, Request::EraseMode>)
 			{
 				switch (v.value())
 				{
-				case EraseRequest::EraseMode::REMOVE:  return "REMOVE";
-				case EraseRequest::EraseMode::CLEAR:   return "CLEAR";
-				case EraseRequest::EraseMode::UNKNOWN: return "UNKNOWN";
+				case Request::EraseMode::REMOVE:  return "REMOVE";
+				case Request::EraseMode::CLEAR:   return "CLEAR";
+				case Request::EraseMode::UNKNOWN: return "UNKNOWN";
 				default: return "?";
 				}
 			}
@@ -716,19 +655,50 @@ public:
 	}
 };
 
-
-
-class NBT_Erase_Visitor : public NBT_Visitor
-{
-
-};
-
-
 class NBTErase
 {
 public:
-	using NbtPathTrieTree = TrieTree<NbtPath::Step, EraseRequest::EraseMode, NbtPath::StepHash, NbtPath::StepEqual>;
+	struct Request
+	{
+	public:
+		enum class EraseMode : uint8_t
+		{
+			REMOVE,
+			CLEAR,
+			UNKNOWN,
+		};
 
+	public:
+		NbtPath::PathInfo stNbtPath{};
+		EraseMode enMode = EraseMode::UNKNOWN;
+
+	public:
+		std::string ToString(void) const
+		{
+			std::string strRet = "EraseMode: [";
+			switch (enMode)
+			{
+			case EraseMode::REMOVE:
+				strRet += "REMOVE] ";
+				break;
+			case EraseMode::CLEAR:
+				strRet += "CLEAR] ";
+				break;
+			case EraseMode::UNKNOWN:
+			default:
+				strRet += "UNKNOWN] ";
+				break;
+			}
+
+			strRet += std::format("Path: {}", NbtPath::PathToString(stNbtPath));
+			return strRet;
+		}
+	};
+
+	using RequestList = std::vector<Request>;
+	using NbtPathTrieTree = TrieTree<NbtPath::Step, Request::EraseMode, NbtPath::StepHash, NbtPath::StepEqual>;
+
+public:
 	class EraseError : public std::runtime_error
 	{
 	public:
@@ -768,14 +738,14 @@ public:
 			{
 				switch (val.value())
 				{
-				case EraseRequest::EraseMode::CLEAR:
+				case Request::EraseMode::CLEAR:
 					std::visit(
 						[&](auto &v) -> void
 						{
 							v = {};//重置为默认值
 						}, it->second.GetData());//重置值
 					break;
-				case EraseRequest::EraseMode::REMOVE:
+				case Request::EraseMode::REMOVE:
 					rawCpd.erase(it);
 					break;
 				default:
@@ -856,13 +826,13 @@ public:
 			{
 				switch (val.value())
 				{
-				case EraseRequest::EraseMode::CLEAR:
+				case Request::EraseMode::CLEAR:
 					for (size_t i = l; i < r; ++i)
 					{
 						rawList[i] = {};//设置为空
 					}
 					break;
-				case EraseRequest::EraseMode::REMOVE:
+				case Request::EraseMode::REMOVE:
 					//范围删除
 					rawList.erase(rawList.begin() + l, rawList.begin() + r);
 					break;
@@ -898,7 +868,7 @@ public:
 	requires(NBT_Type::IsArrayType_V<Array_Type>)
 	static void ArrayErase(Array_Type &tArray, const NbtPathTrieTree::WalkContext ctx)
 	{
-		GeneralListErase(tArray, ctx);
+		GeneralListErase<Array_Type>(tArray, ctx);
 	}
 
 	static void EraseSwitch(NBT_Node &node, NbtPathTrieTree::WalkContext ctx)
@@ -927,7 +897,7 @@ public:
 	}
 
 public:
-	static NbtPathTrieTree EraseRequest2NbtPathTrieTree(const EraseRequestList &listEraseReq)
+	static NbtPathTrieTree EraseRequest2NbtPathTrieTree(const RequestList &listEraseReq)
 	{
 		//构造前缀树
 		NbtPathTrieTree tt;

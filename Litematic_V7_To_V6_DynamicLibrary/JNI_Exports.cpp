@@ -4,6 +4,7 @@
 #include <format>
 #include <stdint.h>
 #include <jni.h>
+#include <compare>
 
 #define JBYTEARRAY_MAXSIZE (INT32_MAX - 8)
 
@@ -312,144 +313,302 @@ struct MyCompoundSort
 	}
 };
 
-extern "C"
+/*
+ * java.lang 包下的所有基础异常类（按字母序排列）：
+ *
+ * 一、RuntimeException 及其子类（非检查型异常）：
+ *   - ArithmeticException: 算术条件异常，如整数除以零
+ *   - ArrayIndexOutOfBoundsException: 数组索引越界
+ *   - ArrayStoreException: 向数组中存储了错误类型的对象
+ *   - ClassCastException: 试图将对象强制转换为非其子类的类型
+ *   - IllegalArgumentException: 向方法传递了非法或不合适的参数
+ *   - IllegalMonitorStateException: 线程试图在未持有对象监视器的情况下等待或通知
+ *   - IllegalStateException: 在不合适的时间调用了方法，或当前环境不满足操作要求
+ *   - IllegalThreadStateException: 线程在不合适的状态下被执行了操作
+ *   - IndexOutOfBoundsException: 索引（如数组、字符串或向量）超出范围
+ *   - NegativeArraySizeException: 试图创建大小为负的数组
+ *   - NullPointerException: 在需要对象的地方使用了 null 引用
+ *   - NumberFormatException: 试图将字符串转换为数值类型，但格式不正确（IllegalArgumentException 的子类）
+ *   - SecurityException: 安全管理器抛出的异常，表示安全违规
+ *
+ * 二、其他 Exception 子类（检查型异常）：
+ *   - ClassNotFoundException: 类加载器无法找到指定的类
+ *   - CloneNotSupportedException: 试图克隆一个未实现 Cloneable 接口的对象
+ *   - IllegalAccessException: 试图访问（如反射）一个不可访问的类、方法或字段
+ *   - InstantiationException: 试图通过 newInstance() 创建一个抽象类或接口的实例
+ *   - InterruptedException: 线程在等待、休眠等操作中被中断
+ *
+ * 注：Exception 和 RuntimeException 本身也是 java.lang 下的，但通常不作为“具体异常”直接抛出。
+ */
+#define ThrowJavaException(except_name, except_reason, return_value)\
+do\
+{\
+	/*如果这里类找不到，那么JVM会自动设置ClassNoFoundException，下面检测到nullptr直接返回即可*/\
+	jclass exceptionClass = env->FindClass(except_name);\
+	if (exceptionClass != nullptr)\
+	{\
+		env->ThrowNew(exceptionClass, (except_reason));\
+		env->DeleteLocalRef(exceptionClass);\
+	}\
+	return return_value;\
+} while (false)
+
+enum class JNI_Operator : jint
 {
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_nativeV7ToV6(JNIEnv * env, jclass clazz, jbyteArray input)//jobject obj
+	UNKNOWN = 0,
+	CONVERT_V7_TO_V6 = 1,
+	SORT_FIELDS = 2,
+	ERASE_FIELDS = 3,
+
+	ENUM_END,
+};
+
+std::strong_ordering operator<=>(JNI_Operator l, jint r)
 	{
-		if (input == nullptr)
+		return (jint)l <=> r;
+	}
+
+std::strong_ordering operator<=>(jint l, JNI_Operator r)
+	{
+		return l <=> (jint)r;
+	}
+
+bool operator==(JNI_Operator l, jint r)
+	{
+		return (jint)l == r;
+	}
+
+bool operator==(jint l, JNI_Operator r)
+	{
+		return l == (jint)r;
+	}
+
+bool operator!=(JNI_Operator l, jint r)
+	{
+		return (jint)l != r;
+	}
+
+bool operator!=(jint l, JNI_Operator r)
+	{
+		return l != (jint)r;
+	}
+
+JNI_Operator JintToJNI_Operator(jint op)
+	{
+		if (op < 0 || op >= JNI_Operator::ENUM_END)
 		{
-			return nullptr;
+			return JNI_Operator::UNKNOWN;
 		}
+
+		return (JNI_Operator)op;
+	}
+
+
+template <typename JArrayType>
+struct JNIArrayHelper;
+
+template <>
+struct JNIArrayHelper<jbyteArray>
+	{
+		using value_type = jbyte;
+
+		static value_type *GetElements(JNIEnv *env, jbyteArray arr, jboolean *isCopy)
+		{
+			return env->GetByteArrayElements(arr, isCopy);
+		}
+		static void ReleaseElements(JNIEnv *env, jbyteArray arr, value_type *elems, jint mode)
+		{
+			env->ReleaseByteArrayElements(arr, elems, mode);
+		}
+	};
+
+template <>
+struct JNIArrayHelper<jintArray>
+	{
+		using value_type = jint;
+
+		static value_type *GetElements(JNIEnv *env, jintArray arr, jboolean *isCopy)
+		{
+			return env->GetIntArrayElements(arr, isCopy);
+		}
+		static void ReleaseElements(JNIEnv *env, jintArray arr, value_type *elems, jint mode)
+		{
+			env->ReleaseIntArrayElements(arr, elems, mode);
+		}
+	};
+
+template <>
+struct JNIArrayHelper<jlongArray>
+	{
+		using value_type = jlong;
+
+		static value_type *GetElements(JNIEnv *env, jlongArray arr, jboolean *isCopy)
+		{
+			return env->GetLongArrayElements(arr, isCopy);
+		}
+		static void ReleaseElements(JNIEnv *env, jlongArray arr, value_type *elems, jint mode)
+		{
+			env->ReleaseLongArrayElements(arr, elems, mode);
+		}
+	};
+
+
+template<typename JNIArrayType>
+struct JNIReadOnlyArray
+	{
+	public:
+		using ArrHelper = JNIArrayHelper<JNIArrayType>;
+
+	public:
+		JNIEnv * const env;
+		const JNIArrayType jarray;
+		const jsize size;
+		const typename ArrHelper::value_type *buffer;
+
+	public:
+		JNIReadOnlyArray(JNIEnv *_env, JNIArrayType _jarray) :
+			env(_env),
+			jarray(_jarray),
+			size(env->GetArrayLength(_jarray)),
+			buffer(ArrHelper::GetElements(env, jarray, nullptr))
+		{}
+		~JNIReadOnlyArray(void)
+		{
+			ArrHelper::ReleaseElements(env, jarray, const_cast<ArrHelper::value_type *>(buffer), JNI_ABORT);
+		}
+
+		const typename ArrHelper::value_type &operator[](jsize index) const
+		{
+			return buffer[index];
+		}
+	};
+
+struct NBT_Print2String
+{
+public:
+	using Level = NBT_Print_Level;
+
+public:
+	std::string &strPrint;
+
+public:
+	template<typename... Args>
+	void operator()(Level lvl, const std::format_string<Args...> fmt, Args&&... args) const noexcept
+	{
+		strPrint += std::format(std::move(fmt), std::forward<Args>(args)...);
+	}
+
+	template<typename... Args>
+	void operator()(const std::format_string<Args...> fmt, Args&&... args) const noexcept
+	{
+		strPrint += std::format(std::move(fmt), std::forward<Args>(args)...);
+	}
+};
+
+/*
+ops[i]为第i个对nbtData数据进行的操作
+paramBlocks[i]的i与前相同，为第i个对nbtData数据进行操作时需要用到的额外参数获取方式
+[paramData[paramBlocks[i] >> 32] , paramData[paramBlocks[i] >> 32 + paramBlocks[i] & 0xFFFFFFFFL])为对第i个对nbtData数据进行操作时需要用到的额外参数
+*/
+extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeExecute(JNIEnv *env, [[maybe_unused]] jclass clazz, jbyteArray nbtData, jintArray ops, jlongArray paramBlocks, jbyteArray paramData)
+{
+	if (nbtData == nullptr || ops == nullptr || paramBlocks == nullptr || paramData == nullptr)
+	{
+		ThrowJavaException("java/lang/IllegalArgumentException", "Native method received null argument", nullptr);
+	}
+
+	//初始化操作数组
+	JNIReadOnlyArray<jintArray> arrOps{ env, ops };
+	JNIReadOnlyArray<jlongArray> arrParamBlocks{ env, paramBlocks };
+	JNIReadOnlyArray<jbyteArray> arrParamData{ env, paramData };
+	if (arrOps.size != arrParamBlocks.size)
+	{
+		ThrowJavaException("java/lang/IllegalArgumentException", "[ops] array and [paramBlocks] array must have the same size", nullptr);
+	}
+
+
+	NBT_Type::Compound cpdNBTData{};
+	size_t szInputStreamSize = 0;//优化用
+	{
+		JNIInputStream nbtInputStream{ env, nbtData };
+		szInputStreamSize = nbtInputStream.Size();
+		std::string strErrMsg{};
+		if (!NBT_Reader::ReadNBT(nbtInputStream, cpdNBTData, 512, NBT_Print2String{ strErrMsg }))
+		{
+			ThrowJavaException("java/io/IOException", std::format("Failed to read NBT data from input stream, info:\n{}\n", strErrMsg).c_str(), nullptr);
+		}
+	}
+
+	//是否自定义排序输出
+	bool bUseMySortOutput = false;
+	for (jsize i = 0; i < arrOps.size; ++i)
+	{
+		JNI_Operator curop = JintToJNI_Operator(arrOps[i]);
+		switch (curop)
+		{
+		case JNI_Operator::CONVERT_V7_TO_V6:
+			{
+				if (arrParamBlocks[i] != (jlong)0)//必须无参数
+				{
+					ThrowJavaException("java/lang/IllegalArgumentException", std::format("Operation CONVERT_V7_TO_V6 expects no parameters, but paramBlocks[{}] = {} is not 0", i, arrParamBlocks[i]).c_str(), nullptr);
+				}
+
+				NBT_Type::Compound cpdNewNBTData{};
+				std::string strErrMsg;
+				if (!ConvertLitematicData_V7_To_V6(cpdNBTData, cpdNewNBTData, strErrMsg))//从cpdNBTData转换到cpdNewNBTData
+				{
+					ThrowJavaException("java/lang/IllegalStateException", std::format("Failed to convert V7 data to V6: {}", strErrMsg).c_str(), nullptr);
+				}
+
+				cpdNBTData = std::move(cpdNewNBTData);
+			}
+			break;
+		case JNI_Operator::SORT_FIELDS:
+			{
+				if (arrParamBlocks[i] != (jlong)0)//必须无参数
+				{
+					ThrowJavaException("java/lang/IllegalArgumentException", std::format("Operation SORT_FIELDS expects no parameters, but paramBlocks[{}] = {} is not 0", i, arrParamBlocks[i]).c_str(), nullptr);
+				}
+
+				bUseMySortOutput = true;//仅设置标签，最终影响输出排序
+			}
+			break;
+		case JNI_Operator::ERASE_FIELDS:
+			{
+				//针对小于n个删除路径的优化（直接查找删除），大于n个则构建前缀树
+
+
+
+			}
+			break;
+		case JNI_Operator::UNKNOWN:
+		default:
+			ThrowJavaException("java/lang/IllegalArgumentException", std::format("Unsupported Operator at index: {}", i).c_str(), nullptr);
+			break;
+		}
+	}
+
+
+	// 创建输出流
+	JNIOutputStream outputStream(env, szInputStreamSize);
+	if (bUseMySortOutput)
+	{
+		std::string strErrMsg{};
+		MyCompoundSort::Reset();
+		if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputStream, cpdNBTData, 512, NBT_Print2String{ strErrMsg }))
+		{
+			ThrowJavaException("java/io/IOException", std::format("Failed to write NBT data to output stream, info:\n{}\n", strErrMsg).c_str(), nullptr);
+		}
+	}
+	else
+	{
+		std::string strErrMsg{};
+		if (!NBT_Writer::WriteNBT(outputStream, cpdNBTData, 512, NBT_Print2String{ strErrMsg }))
+		{
+			ThrowJavaException("java/io/IOException", std::format("Failed to write NBT data to output stream, info:\n{}\n", strErrMsg).c_str(), nullptr);
+		}
+	}
 	
-		try
-		{
-			// 创建输入流
-			NBT_Type::Compound cpdTmpV7Input{};
-			size_t szV7StreamSize = 0;
-			{
-				JNIInputStream inputV7Stream(env, input);
-				szV7StreamSize = inputV7Stream.Size();
-				if (!NBT_Reader::ReadNBT(inputV7Stream, cpdTmpV7Input, 512, NBT_NoPrint{}))
-				{
-					throw std::runtime_error("Unable to parse data from stream!");
-				}
-			}
-
-			// 创建输出流
-			JNIOutputStream outputV6Stream(env, szV7StreamSize);
-			{
-				//转换数据
-				NBT_Type::Compound cpdV6Output{};
-				NBT_Type::Compound cpdV7Input = std::move(cpdTmpV7Input);
-				try
-				{
-					std::string strErrMsg;
-					if (!ConvertLitematicData_V7_To_V6(cpdV7Input, cpdV6Output, strErrMsg))//从cpdV7Input转换到cpdV6Output
-					{
-						throw std::runtime_error(strErrMsg);
-					}
-				}
-				catch (const std::exception &e)
-				{
-					throw std::runtime_error(std::format("Unable to convert v7_data to v6_data: [{}]", e.what()));
-				}
-
-				MyCompoundSort::Reset();
-				if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputV6Stream, cpdV6Output, 512, NBT_NoPrint{}))
-				{
-					throw std::runtime_error("Unable to write data into stream!\n");
-				}
-			}
-	
-			// 返回结果
-			return outputV6Stream.ToJByteArray();
-		}
-		catch (const std::exception &e)
-		{
-			// 可以选择抛出 Java 异常
-			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
-			if (exceptionClass != nullptr)
-			{
-				env->ThrowNew(exceptionClass, e.what());
-				env->DeleteLocalRef(exceptionClass);
-			}
-			return nullptr;
-		}
-		catch (...)
-		{
-			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
-			if (exceptionClass != nullptr)
-			{
-				env->ThrowNew(exceptionClass, "Unknown Exception");
-				env->DeleteLocalRef(exceptionClass);
-			}
-			return nullptr;
-		}
-	}
-
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeSortFields(JNIEnv *env, jclass clazz, jbyteArray input)
-	{
-		if (input == nullptr)
-		{
-			return nullptr;
-		}
-
-		try
-		{
-			// 创建输入流
-			NBT_Type::Compound cpdSortTemp{};
-			size_t szStreamSize = 0;
-			{
-				JNIInputStream inputStream(env, input);
-				szStreamSize = inputStream.Size();
-				if (!NBT_Reader::ReadNBT(inputStream, cpdSortTemp, 512, NBT_NoPrint{}))
-				{
-					throw std::runtime_error("Unable to parse data from stream!");
-				}
-			}
-
-			// 创建输出流
-			JNIOutputStream outputStream(env, szStreamSize);
-			MyCompoundSort::Reset();
-			if (!NBT_Writer::WriteNBT<MyCompoundSort>(outputStream, cpdSortTemp, 512, NBT_NoPrint{}))
-			{
-				throw std::runtime_error("Unable to write data into stream!\n");
-			}
-
-			// 返回结果
-			return outputStream.ToJByteArray();
-		}
-		catch (const std::exception &e)
-		{
-			// 可以选择抛出 Java 异常
-			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
-			if (exceptionClass != nullptr)
-			{
-				env->ThrowNew(exceptionClass, e.what());
-				env->DeleteLocalRef(exceptionClass);
-			}
-			return nullptr;
-		}
-		catch (...)
-		{
-			jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
-			if (exceptionClass != nullptr)
-			{
-				env->ThrowNew(exceptionClass, "Unknown Exception");
-				env->DeleteLocalRef(exceptionClass);
-			}
-			return nullptr;
-		}
-	}
-
-	JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeEraseFields(JNIEnv *env, jclass clazz, jbyteArray input, jobject fieldModes)
-	{
-		if (input == nullptr || fieldModes == nullptr)
-		{
-			return nullptr;
-		}
-
-
-		return nullptr;
-	}
+	// 返回结果
+	return outputStream.ToJByteArray();
 }

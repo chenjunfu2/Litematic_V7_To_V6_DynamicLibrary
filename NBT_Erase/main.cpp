@@ -111,7 +111,7 @@ void ParseTest(void)
 		{
 			print("Parse Path: {}\n", MU8CV2CTU8(it));
 			path = NbtPath::PathParser(it);
-			print("Parse Success: {}\n\n", NbtPath::ToString(path));
+			print("Parse Success: {}\n\n", NbtPath::PathToString(path));
 		}
 		catch (const NbtPath::ParseError &e)
 		{
@@ -167,12 +167,12 @@ void testNbtErase()
 		  NBT_Type::Byte(0x40), NBT_Type::Byte(0x50) });
 
 	// ========== 定义删除/清空请求 ==========
-	EraseRequestList requests = {
-		{ NbtPath::PathParser(MU8STRV("Damage")),                EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("TestFloat")),             EraseRequest::EraseMode::CLEAR  },
-		{ NbtPath::PathParser(MU8STRV("Enchantments/[]/lvl")),   EraseRequest::EraseMode::CLEAR  },
-		{ NbtPath::PathParser(MU8STRV("list_test/[0]")),         EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("byte_array_test/[1..2]")),EraseRequest::EraseMode::REMOVE },
+	NBTErase::RequestList requests = {
+		{ NbtPath::PathParser(MU8STRV("Damage")),                NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("TestFloat")),             NBTErase::Request::EraseMode::CLEAR  },
+		{ NbtPath::PathParser(MU8STRV("Enchantments/[]/lvl")),   NBTErase::Request::EraseMode::CLEAR  },
+		{ NbtPath::PathParser(MU8STRV("list_test/[0]")),         NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("byte_array_test/[1..2]")),NBTErase::Request::EraseMode::REMOVE },
 	};
 
 	// ========== 执行删除流程 ==========
@@ -326,21 +326,21 @@ void testNbtErase2()
 	// ================================================================
 	// 定义擦除请求（覆盖多种模式）
 	// ================================================================
-	EraseRequestList requests = {
-		{ NbtPath::PathParser(MU8STRV("Damage")),      EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("TestFloat")),   EraseRequest::EraseMode::CLEAR  },
-		{ NbtPath::PathParser(MU8STRV("Coordinates/x")), EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("Enchantments/[]/lvl")), EraseRequest::EraseMode::CLEAR },
-		{ NbtPath::PathParser(MU8STRV("IntList/[0]")),  EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("IntList/[2..3]")), EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("NestedLists/[1]/[1]")), EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("ByteArr/[1..3]")), EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("IntArr/[0]")),    EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("LongArr/[]")),    EraseRequest::EraseMode::CLEAR  },
-		{ NbtPath::PathParser(MU8STRV("L1/L2/L3/leaf")), EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("L1/L2/value")),   EraseRequest::EraseMode::CLEAR  },
-		{ NbtPath::PathParser(MU8STRV("NoSuchPath")),     EraseRequest::EraseMode::REMOVE },
-		{ NbtPath::PathParser(MU8STRV("Enchantments/[10]/id")), EraseRequest::EraseMode::REMOVE },
+	NBTErase::RequestList requests = {
+		{ NbtPath::PathParser(MU8STRV("Damage")),      NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("TestFloat")),   NBTErase::Request::EraseMode::CLEAR  },
+		{ NbtPath::PathParser(MU8STRV("Coordinates/x")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("Enchantments/[]/lvl")), NBTErase::Request::EraseMode::CLEAR },
+		{ NbtPath::PathParser(MU8STRV("IntList/[0]")),  NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("IntList/[2..3]")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("NestedLists/[1]/[1]")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("ByteArr/[1..3]")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("IntArr/[0]")),    NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("LongArr/[]")),    NBTErase::Request::EraseMode::CLEAR  },
+		{ NbtPath::PathParser(MU8STRV("L1/L2/L3/leaf")), NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("L1/L2/value")),   NBTErase::Request::EraseMode::CLEAR  },
+		{ NbtPath::PathParser(MU8STRV("NoSuchPath")),     NBTErase::Request::EraseMode::REMOVE },
+		{ NbtPath::PathParser(MU8STRV("Enchantments/[10]/id")), NBTErase::Request::EraseMode::REMOVE },
 	};
 
 	// ================================================================
@@ -456,21 +456,21 @@ void testNbtErase2()
 
 void TrieTreeTest(void)
 {
-	EraseRequestList req
+	NBTErase::RequestList req
 	{
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/baz")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo")),		.enMode = EraseRequest::EraseMode::CLEAR },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[1..2]/foo/bar")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = EraseRequest::EraseMode::UNKNOWN },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("other/leaf")),			.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),	.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = EraseRequest::EraseMode::UNKNOWN },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d")),				.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),				.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/[9..]")),			.enMode = EraseRequest::EraseMode::REMOVE },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = EraseRequest::EraseMode::CLEAR },
-		EraseRequest{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = EraseRequest::EraseMode::CLEAR },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/bar")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo/baz")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/foo")),		.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[1..2]/foo/bar")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("test/[0..3]/qux")),		.enMode = NBTErase::NBTErase::Request::EraseMode::UNKNOWN },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("other/leaf")),			.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("other/branch/deep")),	.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d/e")),			.enMode = NBTErase::NBTErase::Request::EraseMode::UNKNOWN },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/d")),				.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c")),				.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("a/b/c/[9..]")),			.enMode = NBTErase::NBTErase::Request::EraseMode::REMOVE },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[0]/y")),				.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
+		NBTErase::NBTErase::Request{.stNbtPath = NbtPath::PathParser(MU8STRV("x/[1]/z")),				.enMode = NBTErase::NBTErase::Request::EraseMode::CLEAR },
 	};
 
 	auto tt = NBTErase::EraseRequest2NbtPathTrieTree(req);
