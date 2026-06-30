@@ -120,7 +120,7 @@ jobs:
       # List Unix
       - name: List Dir (Unix)
         if: runner.os != 'Windows'
-        run: find . -type f | sort
+        run: find . -type f -o -type d | sort
 
       # List Windows
       - name: List Dir (Windows)
@@ -151,10 +151,17 @@ jobs:
          pattern: "*"
          merge-multiple: true
 
+     - name: List contents of release-assets
+       run: |
+         cd release-assets/
+         find . -type f -o -type d | sort
+       shell: bash
+
      - name: Zip each platform folder
        run: |
-         cd release-assets/artifacts
+         cd release-assets/
          for dir in */; do
+           [ -d "$dir" ] || continue
            (cd "$dir" && zip -r "../../${dir%/}.zip" .)
          done
        shell: bash
