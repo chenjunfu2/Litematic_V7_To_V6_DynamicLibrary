@@ -162,7 +162,7 @@ jobs:
          cd release-assets/
          for dir in */; do
            [ -d "$dir" ] || continue
-           (cd "$dir" && zip -r "../../${dir%/}.zip" .)
+           (cd "$dir" && zip -r "../${dir%/}.zip" .)
          done
        shell: bash
 
