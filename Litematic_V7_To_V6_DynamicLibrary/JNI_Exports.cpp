@@ -603,7 +603,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 				u32MapSize = NBT_Endian::BigToNativeAny(u32MapSize);
 
 				//接下来是1字节模式，2字节长度与字符串的循环，前面的size代表循环有多少个
-				NBTErase::RequestList requests{};
+				NBTErase::NbtPathTrieTree pathTrieTree;//路径前缀树
 				for (uint32_t reqIdx = 0; reqIdx < u32MapSize; ++reqIdx)
 				{
 					uint8_t u8Mode = 0;
@@ -632,9 +632,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 					{
 						NBT_Type::String::View curPath{ (MUTF8_Char_Type *)&iptStream[iptStream.Index()], (size_t)u16StrSize };
 						iptStream.SkipData(u16StrSize);
-
-						NBTErase::Request reqNew = { NbtPath::PathParser(curPath), (NBTErase::Request::EraseMode)u8Mode };
-						requests.push_back(std::move(reqNew));
+						pathTrieTree.Insert(NbtPath::PathParser(curPath), (NBTErase::Request::EraseMode)u8Mode);
 					}
 					catch (const NbtPath::ParseError &e)
 					{
@@ -645,7 +643,6 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 				//路径解析处理完成，进行建树后删除
 				try
 				{
-					auto pathTrieTree = NBTErase::EraseRequest2NbtPathTrieTree(requests);
 					NBTErase::NbtParseToErase(cpdNBTData, pathTrieTree);
 				}
 				catch (const NBTErase::EraseError &e)
