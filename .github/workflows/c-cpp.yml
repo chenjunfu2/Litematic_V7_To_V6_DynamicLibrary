@@ -149,13 +149,21 @@ jobs:
        with:
          path: release-assets
          pattern: "*"
-         merge-multiple: false
+         merge-multiple: true
 
-     - name: Create Release and upload assets
-       uses: softprops/action-gh-release@v2
+     - name: Zip each platform folder
+       run: |
+         cd release-assets/artifacts
+         for dir in */; do
+           (cd "$dir" && zip -r "../../${dir%/}.zip" .)
+         done
+       shell: bash
+
+     - name: Upload to Release
+       uses: softprops/action-gh-release@v3
        with:
          tag_name: ${{ github.ref_name }}
          name: Release ${{ github.ref_name }}
-         files: release-assets/**/*
+         files: release-assets/*.zip
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
