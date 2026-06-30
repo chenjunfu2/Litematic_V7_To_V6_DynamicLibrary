@@ -166,6 +166,12 @@ jobs:
          done
        shell: bash
 
+     - name: List zip files
+       run: |
+         cd release-assets/
+         find . -name "*.zip" -type f
+       shell: bash
+
      - name: Upload to Release
        uses: softprops/action-gh-release@v3
        with:
