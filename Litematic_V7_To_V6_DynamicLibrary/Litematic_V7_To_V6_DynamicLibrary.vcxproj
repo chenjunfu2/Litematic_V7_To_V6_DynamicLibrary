@@ -333,14 +333,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BaseConversion.hpp" />
-    <ClInclude Include="ComponentsTagConversion.hpp" />
+    <ClInclude Include="BlockConversion.hpp" />
+    <ClInclude Include="BlockMappings.hpp" />
     <ClInclude Include="EntityConversion.hpp" />
+    <ClInclude Include="ItemConversion.hpp" />
+    <ClInclude Include="ItemMappings.hpp" />
     <ClInclude Include="jni\x64\include\jni.h" />
     <ClInclude Include="jni\x64\include\jni_md.h" />
     <ClInclude Include="LitematicConversion.hpp" />
-    <ClInclude Include="Mappings.hpp" />
     <ClInclude Include="NBT_Erase.hpp" />
     <ClInclude Include="RegionConversion.hpp" />
+    <ClInclude Include="TagMappings.hpp" />
     <ClInclude Include="TileEntityConversion.hpp" />
   </ItemGroup>
   <ItemGroup>

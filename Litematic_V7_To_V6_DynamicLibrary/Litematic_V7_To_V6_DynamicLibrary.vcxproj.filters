@@ -47,10 +47,22 @@
     <ClInclude Include="jni\x64\include\jni.h">
       <Filter>头文件\jni\x64\include</Filter>
     </ClInclude>
-    <ClInclude Include="Mappings.hpp">
+    <ClInclude Include="NBT_Erase.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="ItemConversion.hpp">
+      <Filter>头文件\LitematicConversion</Filter>
+    </ClInclude>
+    <ClInclude Include="ItemMappings.hpp">
+      <Filter>头文件\LitematicConversion</Filter>
+    </ClInclude>
+    <ClInclude Include="LitematicConversion.hpp">
       <Filter>头文件\LitematicConversion</Filter>
     </ClInclude>
     <ClInclude Include="RegionConversion.hpp">
+      <Filter>头文件\LitematicConversion</Filter>
+    </ClInclude>
+    <ClInclude Include="TagMappings.hpp">
       <Filter>头文件\LitematicConversion</Filter>
     </ClInclude>
     <ClInclude Include="TileEntityConversion.hpp">
@@ -59,17 +71,14 @@
     <ClInclude Include="BaseConversion.hpp">
       <Filter>头文件\LitematicConversion</Filter>
     </ClInclude>
-    <ClInclude Include="ComponentsTagConversion.hpp">
+    <ClInclude Include="BlockConversion.hpp">
+      <Filter>头文件\LitematicConversion</Filter>
+    </ClInclude>
+    <ClInclude Include="BlockMappings.hpp">
       <Filter>头文件\LitematicConversion</Filter>
     </ClInclude>
     <ClInclude Include="EntityConversion.hpp">
       <Filter>头文件\LitematicConversion</Filter>
-    </ClInclude>
-    <ClInclude Include="LitematicConversion.hpp">
-      <Filter>头文件\LitematicConversion</Filter>
-    </ClInclude>
-    <ClInclude Include="NBT_Erase.hpp">
-      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
