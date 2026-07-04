@@ -7,15 +7,62 @@
 #include <jni.h>
 #include <compare>
 
-#define JBYTEARRAY_MAXSIZE (INT32_MAX - 8)
+#define JINT_MAX (INT32_MAX)
+#define JBYTEARRAY_MAXSIZE (JINT_MAX - 8)
+
+// 获取当前 position 值（缓存 method id）
+static jint GetCurrentPosition(JNIEnv *env, jobject bufferObj)
+{
+	static jclass cls = (jclass)env->NewGlobalRef(env->FindClass("java/nio/Buffer"));
+	static jmethodID mid = env->GetMethodID(cls, "position", "()I");
+	if (mid == nullptr)
+	{
+		throw std::runtime_error("Fail to get method position() in java/nio/Buffer");
+	}
+	return env->CallIntMethod(bufferObj, mid);
+}
+
+// 获取当前 limit 值（缓存 method id）
+static jint GetCurrentLimit(JNIEnv *env, jobject bufferObj)
+{
+	static jclass cls = (jclass)env->NewGlobalRef(env->FindClass("java/nio/Buffer"));
+	static jmethodID mid = env->GetMethodID(cls, "limit", "()I");
+	if (mid == nullptr)
+	{
+		throw std::runtime_error("Fail to get method limit() in java/nio/Buffer");
+	}
+	return env->CallIntMethod(bufferObj, mid);
+}
+
+// 设置 Java Buffer 的 position 值（缓存 Method ID）
+static void SetBufferPosition(JNIEnv *env, jobject bufferObj, jint pos)
+{
+	static jclass cls = (jclass)env->NewGlobalRef(env->FindClass("java/nio/Buffer"));
+	static jmethodID mid = env->GetMethodID(cls, "position", "(I)Ljava/nio/Buffer;");
+	if (mid == nullptr)
+	{
+		throw std::runtime_error("Failed to get method: position(I)Ljava/nio/Buffer;");
+	}
+	env->CallObjectMethod(bufferObj, mid, pos);
+}
+
+// 设置 Java Buffer 的 limit 值（缓存 Method ID）
+static void SetBufferLimit(JNIEnv *env, jobject bufferObj, jint lim)
+{
+	static jclass cls = (jclass)env->NewGlobalRef(env->FindClass("java/nio/Buffer"));
+	static jmethodID mid = env->GetMethodID(cls, "limit", "(I)Ljava/nio/Buffer;");
+	if (mid == nullptr)
+	{
+		throw std::runtime_error("Failed to get method: limit(I)Ljava/nio/Buffer;");
+	}
+	env->CallObjectMethod(bufferObj, mid, lim);
+}
 
 /// @brief JNI 输入流适配器，用于从 jbyteArray 读取数据
 class JNIInputStream
 {
 private:
-	JNIEnv *env;
-	jbyteArray data;
-	jbyte *buffer;
+	uint8_t *buffer;
 	size_t size;
 	size_t position;
 
@@ -23,32 +70,22 @@ public:
 	/// @brief 构造函数，从 jbyteArray 创建输入流
 	/// @param env JNI 环境指针
 	/// @param input Java 字节数组
-	JNIInputStream(JNIEnv *env, jbyteArray input)
-		: env(env), data(input), buffer(nullptr), size(0), position(0)
+	JNIInputStream(JNIEnv *env, jobject inputDirectByteBuffer) ://要求inputDirectByteBuffer不为nullptr
+		buffer((uint8_t *)env->GetDirectBufferAddress(inputDirectByteBuffer)),
+		size(0),
+		position(0)
 	{
-		if (input == nullptr)
-		{
-			throw std::runtime_error("Input jbyteArray is null");
-		}
-
-		size = env->GetArrayLength(input);
-		buffer = env->GetByteArrayElements(input, nullptr);
-
 		if (buffer == nullptr)
 		{
-			throw std::runtime_error("Failed to get byte array elements");
+			throw std::runtime_error("Failed to get DirectByteBuffer address");
 		}
+
+		position = GetCurrentPosition(env, inputDirectByteBuffer);
+		size = GetCurrentLimit(env, inputDirectByteBuffer);
 	}
 
-	/// @brief 析构函数，自动释放 JNI 资源
-	~JNIInputStream()
-	{
-		if (buffer != nullptr)
-		{
-			env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
-			buffer = nullptr;
-		}
-	}
+	/// @brief 析构函数，无需释放DirectByteBuffer资源
+	~JNIInputStream() = default;
 
 	// 禁止拷贝和移动
 	JNIInputStream(const JNIInputStream &) = delete;
@@ -87,7 +124,7 @@ public:
 	/// @brief 获取当前读取位置的指针
 	const uint8_t *CurData() const noexcept
 	{
-		return (uint8_t *)&buffer[position];
+		return &buffer[position];
 	}
 
 	/// @brief 向后推进读取
@@ -131,7 +168,7 @@ public:
 	/// @brief 获取底层数据的起始指针
 	const uint8_t *BaseData() const noexcept
 	{
-		return (const uint8_t *)buffer;
+		return buffer;
 	}
 
 	/// @brief 获取当前读取位置（只读）
@@ -152,15 +189,14 @@ public:
 class JNIOutputStream
 {
 private:
-	JNIEnv *env;
-	std::vector<uint8_t> buffer;  // 先写入到 vector，最后再转为 jbyteArray
+	std::vector<uint8_t> buffer;  // 先写入到 vector，最后写入 DirectByteBuffer 或在空间不够时转为 jbyteArray 
 
 public:
 	using StreamType = jbyteArray;
 	using ValueType = uint8_t;
 
 	/// @brief 构造函数
-	JNIOutputStream(JNIEnv *env, size_t szReserve = 1024) : env(env)
+	JNIOutputStream(size_t szReserve = 1024)
 	{
 		//初始预留空间
 		buffer.reserve(szReserve);
@@ -235,7 +271,7 @@ public:
 
 	/// @brief 创建 jbyteArray 并转移数据所有权
 	/// @return 新创建的 jbyteArray，需要调用者用 DeleteLocalRef 释放
-	jbyteArray ToJByteArray()
+	jbyteArray ToJByteArray(JNIEnv *env)
 	{
 		if (buffer.size() > JBYTEARRAY_MAXSIZE)
 		{
@@ -249,9 +285,43 @@ public:
 		{
 			env->SetByteArrayRegion(result, 0, len, (const jbyte *)buffer.data());
 		}
+		else
+		{
+			throw std::runtime_error(std::format("Fail to NewByteArray, len: {}", len));
+		}
 
 		return result;
 	}
+
+	//尝试直接写回DirectByteBuffer
+	bool TryWriteToDirectByteBuffer(JNIEnv *env, jobject outputDirectByteBuffer)
+	{
+		if (buffer.size() > JINT_MAX)
+		{
+			throw std::runtime_error(std::format("JNI DirectByteBuffer size exceeds maximum allowed limit: {} bytes (max: {} bytes)", buffer.size(), JINT_MAX));
+		}
+
+		void *ptr = env->GetDirectBufferAddress(outputDirectByteBuffer);
+		if (ptr == nullptr)
+		{
+			return false;
+		}
+
+		jint len = (jint)buffer.size();
+		jlong capacity = env->GetDirectBufferCapacity(outputDirectByteBuffer);
+		
+		if (len > (size_t)capacity)
+		{
+			return false;
+		}
+		
+		memcpy(ptr, buffer.data(), len);
+		SetBufferPosition(env, outputDirectByteBuffer, 0);
+		SetBufferLimit(env, outputDirectByteBuffer, len);
+
+		return true;
+	}
+
 };
 
 struct MyCompoundSort
@@ -511,7 +581,7 @@ ops[i]为第i个对nbtData数据进行的操作
 paramBlocks[i]的i与前相同，为第i个对nbtData数据进行操作时需要用到的额外参数获取方式
 [paramData[paramBlocks[i] >> 32] , paramData[paramBlocks[i] >> 32 + paramBlocks[i] & 0xFFFFFFFFL])为对第i个对nbtData数据进行操作时需要用到的额外参数
 */
-extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeExecute(JNIEnv *env, [[maybe_unused]] jclass clazz, jbyteArray nbtData, jintArray ops, jlongArray paramBlocks, jbyteArray paramData) try
+extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_SchematicNativeReader_nativeExecute(JNIEnv *env, [[maybe_unused]] jclass clazz, jobject nbtData, jintArray ops, jlongArray paramBlocks, jbyteArray paramData) try
 {
 	if (nbtData == nullptr || ops == nullptr || paramBlocks == nullptr || paramData == nullptr)
 	{
@@ -660,7 +730,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 
 	// 创建输出流
-	JNIOutputStream outputStream(env, szInputStreamSize);
+	JNIOutputStream outputStream(szInputStreamSize);
 	if (bUseMySortOutput)
 	{
 		std::string strErrMsg{};
@@ -678,9 +748,17 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 			ThrowJavaException("java/io/IOException", std::format("Failed to write NBT data to output stream, info:\n{}\n", strErrMsg).c_str(), nullptr);
 		}
 	}
-	
-	// 返回结果
-	return outputStream.ToJByteArray();
+
+	if (outputStream.TryWriteToDirectByteBuffer(env, nbtData))
+	{
+		// 返回空，从nbtData中获取结果
+		return nullptr;
+	}
+	else
+	{
+		// 返回结果，nbtData不使用
+		return outputStream.ToJByteArray(env);
+	}
 }
 catch (std::exception &e)
 {
