@@ -306,8 +306,13 @@ public:
 
 	void NotifyJavaDataWrite(JNIEnv *env)
 	{
+		if (position > JINT_MAX)
+		{
+			throw std::runtime_error(std::format("JNI DirectByteBuffer size exceeds maximum allowed limit: {} bytes (max: {} bytes)", Size(), JINT_MAX));
+		}
+
 		SetBufferPosition(env, outputDirectByteBuffer, 0);
-		SetBufferLimit(env, outputDirectByteBuffer, position);
+		SetBufferLimit(env, outputDirectByteBuffer, (jint)Size());
 	}
 };
 
