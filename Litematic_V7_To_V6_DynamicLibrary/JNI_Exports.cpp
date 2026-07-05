@@ -80,8 +80,19 @@ public:
 			throw std::runtime_error("Failed to get DirectByteBuffer address");
 		}
 
-		position = GetCurrentPosition(env, inputDirectByteBuffer);
-		size = GetCurrentLimit(env, inputDirectByteBuffer);
+		jint iPosition = GetCurrentPosition(env, inputDirectByteBuffer);
+		if (iPosition < 0)
+		{
+			throw std::runtime_error("Failed to get DirectByteBuffer position");
+		}
+		position = (size_t)iPosition;
+
+		jint iSize = GetCurrentLimit(env, inputDirectByteBuffer);
+		if (iSize < 0)
+		{
+			throw std::runtime_error("Failed to get DirectByteBuffer size");
+		}
+		size = (size_t)iSize;
 	}
 
 	/// @brief 析构函数，无需释放DirectByteBuffer资源
@@ -195,7 +206,16 @@ private:
 public:
 	JNIDirectBufferOutputStream(JNIEnv *env, jobject _outputDirectByteBuffer) :
 		buffer((uint8_t *)env->GetDirectBufferAddress(_outputDirectByteBuffer)),
-		size(env->GetDirectBufferCapacity(_outputDirectByteBuffer)),
+		size([&]()-> size_t
+		{
+			jlong capacity = env->GetDirectBufferCapacity(_outputDirectByteBuffer);
+			if (capacity < 0)
+			{
+				throw std::runtime_error("Failed to get DirectByteBuffer capacity");
+			}
+
+			return (size_t)capacity;
+		}()),
 		position(0),
 		outputDirectByteBuffer(_outputDirectByteBuffer)
 	{
@@ -244,7 +264,7 @@ public:
 
 	bool CheckSize(size_t szInputSize)
 	{
-		return size - position > szInputSize;
+		return size - position >= szInputSize;
 	}
 
 	bool PutOnce(uint8_t v)
@@ -440,6 +460,11 @@ public:
 	bool IsUseDirect() const
 	{
 		return bUseDirect;
+	}
+
+	void Finish(JNIEnv *env)
+	{
+		directBuffer.NotifyJavaDataWrite(env);
 	}
 
 	//创建 jbyteArray 并拷贝数据
@@ -891,13 +916,12 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 	if (outputStream.IsUseDirect())
 	{
-		// 返回空，从nbtData中获取结果
-		return nullptr;
+		outputStream.Finish(env);//更新java侧写入结果
+		return nullptr;// 返回空，java侧从nbtData中获取结果
 	}
 	else
 	{
-		// 返回结果，nbtData不使用
-		return outputStream.ToJByteArray(env);
+		return outputStream.ToJByteArray(env);// 返回byte array结果，nbtData不使用
 	}
 }
 catch (std::exception &e)
