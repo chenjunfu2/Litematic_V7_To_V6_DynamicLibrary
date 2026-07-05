@@ -184,23 +184,138 @@ public:
 	}
 };
 
+class JNIDirectBufferOutputStream
+{
+private:
+	uint8_t *const buffer;
+	const size_t size;
+	size_t position;//pos的位置是还没写入的位置，也就是pos最终可以等于size，然后无法写入，pos相当于当前已有数据的大小
+	jobject const outputDirectByteBuffer;
+
+public:
+	JNIDirectBufferOutputStream(JNIEnv *env, jobject _outputDirectByteBuffer) :
+		buffer((uint8_t *)env->GetDirectBufferAddress(_outputDirectByteBuffer)),
+		size(env->GetDirectBufferCapacity(_outputDirectByteBuffer)),
+		position(0),
+		outputDirectByteBuffer(_outputDirectByteBuffer)
+	{
+		if (buffer == nullptr)
+		{
+			throw std::runtime_error("Failed to get DirectByteBuffer address");
+		}
+	}
+
+	JNIDirectBufferOutputStream(const JNIDirectBufferOutputStream &) = delete;
+	JNIDirectBufferOutputStream(JNIDirectBufferOutputStream &&) = default;
+	JNIDirectBufferOutputStream &operator=(const JNIDirectBufferOutputStream &) = delete;
+	JNIDirectBufferOutputStream &operator=(JNIDirectBufferOutputStream &&) = default;
+
+	~JNIDirectBufferOutputStream(void) = default;
+
+	uint8_t &operator[](size_t szIndex)
+	{
+		return buffer[szIndex];
+	}
+
+	const uint8_t &operator[](size_t szIndex) const
+	{
+		return buffer[szIndex];
+	}
+
+	uint8_t *Data(void)
+	{
+		return buffer;
+	}
+
+	const uint8_t *Data(void) const
+	{
+		return buffer;
+	}
+
+	size_t Size(void) const
+	{
+		return position;//pos就是当前数据的size，因为pos位置是还未写入的位置，相当于已写入index + 1 == 当前size
+	}
+
+	void Clear(void)
+	{
+		position = 0;
+	}
+
+	bool CheckSize(size_t szInputSize)
+	{
+		return size - position > szInputSize;
+	}
+
+	bool PutOnce(uint8_t v)
+	{
+		if (!CheckSize(1))
+		{
+			return false;
+		}
+
+		buffer[position] = v;
+		++position;
+		return true;
+	}
+
+	bool Empty(void) const
+	{
+		return position == 0;
+	}
+
+	void UnPut(void)
+	{
+		if (!Empty())
+		{
+			--position;
+		}
+	}
+
+	bool PutRange(const uint8_t *pData, size_t szInputSize)
+	{
+		if (!CheckSize(szInputSize))
+		{
+			return false;
+		}
+
+		memcpy(&buffer[position], pData, szInputSize);
+		position += szInputSize;
+		return true;
+	}
+
+	void NotifyJavaDataWrite(JNIEnv *env)
+	{
+		SetBufferPosition(env, outputDirectByteBuffer, 0);
+		SetBufferLimit(env, outputDirectByteBuffer, position);
+	}
+};
+
+
 /// @brief JNI 输出流适配器，用于将数据写入到 jbyteArray
-/// @note 符合你定义的 DefaultOutputStream 鸭子类型接口
 class JNIOutputStream
 {
 private:
-	std::vector<uint8_t> buffer;  // 先写入到 vector，最后写入 DirectByteBuffer 或在空间不够时转为 jbyteArray 
+	bool bUseDirect = true;
+	JNIDirectBufferOutputStream directBuffer;
+	std::vector<uint8_t> backupBuffer{};  // 备用 vector，写入 DirectByteBuffer 失败时构建，在空间不够时转为 jbyteArray 
 
 public:
 	using StreamType = jbyteArray;
 	using ValueType = uint8_t;
 
-	/// @brief 构造函数
-	JNIOutputStream(size_t szReserve = 1024)
+protected:
+	void MoveDirectToBackup(void)
 	{
-		//初始预留空间
-		buffer.reserve(szReserve);
+		bUseDirect = false;
+		backupBuffer.resize(directBuffer.Size());
+		memcpy(backupBuffer.data(), directBuffer.Data(), directBuffer.Size());//全量转移
 	}
+
+public:
+	/// @brief 构造函数
+	JNIOutputStream(JNIDirectBufferOutputStream _directBuffer) : directBuffer(std::move(_directBuffer))
+	{}
 
 	// 禁止拷贝和移动
 	JNIOutputStream(const JNIOutputStream &) = delete;
@@ -211,79 +326,136 @@ public:
 	/// @brief 下标访问运算符（只读）
 	const ValueType &operator[](size_t index) const noexcept
 	{
-		return buffer[index];
+		if (bUseDirect)
+		{
+			return directBuffer[index];
+		}
+		else
+		{
+			return backupBuffer[index];
+		}
 	}
 
 	/// @brief 向流中写入单个值
 	template<typename V>
 	requires(std::is_constructible_v<ValueType, V &&>)
-		void PutOnce(V &&c)
+	void PutOnce(V &&c)
 	{
-		buffer.push_back(static_cast<ValueType>(std::forward<V>(c)));
+		if (bUseDirect)
+		{
+			if (directBuffer.PutOnce(static_cast<ValueType>(std::forward<V>(c))))
+			{
+				return;
+			}
+			else//空间不足，失败
+			{
+				MoveDirectToBackup();//不返回，走下面的插入
+			}
+		}
+
+		backupBuffer.push_back(static_cast<ValueType>(std::forward<V>(c)));
 	}
 
 	/// @brief 向流中写入一段数据
 	void PutRange(const ValueType *pData, size_t szSize)
 	{
-		size_t currentSize = buffer.size();
-		buffer.resize(currentSize + szSize);
-		memcpy(&buffer[currentSize], pData, szSize);
+		if (bUseDirect)
+		{
+			if (directBuffer.PutRange(pData, szSize))
+			{
+				return;
+			}
+			else//空间不足，失败
+			{
+				MoveDirectToBackup();//不返回，走下面的插入
+			}
+		}
+
+		size_t currentSize = backupBuffer.size();
+		backupBuffer.resize(currentSize + szSize);
+		memcpy(&backupBuffer[currentSize], pData, szSize);
 	}
 
 	/// @brief 预分配额外容量
 	void AddReserve(size_t szAddSize)
 	{
-		buffer.reserve(buffer.size() + szAddSize);
+		if (bUseDirect)
+		{
+			if (directBuffer.CheckSize(szAddSize))
+			{
+				return;
+			}
+			else
+			{
+				MoveDirectToBackup();//不返回，走下面的预分配
+			}
+		}
+
+		backupBuffer.reserve(backupBuffer.size() + szAddSize);
 	}
 
 	/// @brief 删除最后一个写入的字节
 	void UnPut() noexcept
 	{
-		if (!buffer.empty())
+		if (bUseDirect)
 		{
-			buffer.pop_back();
+			directBuffer.UnPut();
+		}
+		else
+		{
+			if (!backupBuffer.empty())
+			{
+				backupBuffer.pop_back();
+			}
 		}
 	}
 
 	/// @brief 获取当前字节流大小
 	size_t Size() const noexcept
 	{
-		return buffer.size();
+		if (bUseDirect)
+		{
+			return directBuffer.Size();
+		}
+		else
+		{
+			return backupBuffer.size();
+		}
 	}
 
 	/// @brief 重置流，清空所有数据
 	void Reset() noexcept
 	{
-		buffer.clear();
-	}
-
-	/// @brief 获取底层数据的常量引用
-	const std::vector<uint8_t> &Data() const noexcept
-	{
-		return buffer;
-	}
-
-	/// @brief 获取底层数据的非常量引用
-	std::vector<uint8_t> &Data() noexcept
-	{
-		return buffer;
-	}
-
-	/// @brief 创建 jbyteArray 并转移数据所有权
-	/// @return 新创建的 jbyteArray，需要调用者用 DeleteLocalRef 释放
-	jbyteArray ToJByteArray(JNIEnv *env)
-	{
-		if (buffer.size() > JBYTEARRAY_MAXSIZE)
+		if (bUseDirect)
 		{
-			throw std::runtime_error(std::format("JNI byte array size exceeds maximum allowed limit: {} bytes (max: {} bytes)", buffer.size(), JBYTEARRAY_MAXSIZE));
+			directBuffer.Clear();
+		}
+		else
+		{
+			backupBuffer.clear();
+		}
+	}
+
+	// 是否直接写回？
+	bool IsUseDirect() const
+	{
+		return bUseDirect;
+	}
+
+	//创建 jbyteArray 并拷贝数据
+	jbyteArray ToJByteArray(JNIEnv *env) const
+	{
+		if (backupBuffer.size() > JBYTEARRAY_MAXSIZE)
+		{
+			throw std::runtime_error(std::format("JNI byte array size exceeds maximum allowed limit: {} bytes (max: {} bytes)", backupBuffer.size(), JBYTEARRAY_MAXSIZE));
 		}
 
-		jsize len = (jsize)buffer.size();
+		jsize len = (jsize)backupBuffer.size();
 		jbyteArray result = env->NewByteArray(len);
 
 		if (result != nullptr && len > 0)
 		{
-			env->SetByteArrayRegion(result, 0, len, (const jbyte *)buffer.data());
+			env->SetByteArrayRegion(result, 0, len, (const jbyte *)backupBuffer.data());
 		}
 		else
 		{
@@ -292,36 +464,6 @@ public:
 
 		return result;
 	}
-
-	//尝试直接写回DirectByteBuffer
-	bool TryWriteToDirectByteBuffer(JNIEnv *env, jobject outputDirectByteBuffer)
-	{
-		if (buffer.size() > JINT_MAX)
-		{
-			throw std::runtime_error(std::format("JNI DirectByteBuffer size exceeds maximum allowed limit: {} bytes (max: {} bytes)", buffer.size(), JINT_MAX));
-		}
-
-		void *ptr = env->GetDirectBufferAddress(outputDirectByteBuffer);
-		if (ptr == nullptr)
-		{
-			return false;
-		}
-
-		jint len = (jint)buffer.size();
-		jlong capacity = env->GetDirectBufferCapacity(outputDirectByteBuffer);
-		
-		if (len > (size_t)capacity)
-		{
-			return false;
-		}
-		
-		memcpy(ptr, buffer.data(), len);
-		SetBufferPosition(env, outputDirectByteBuffer, 0);
-		SetBufferLimit(env, outputDirectByteBuffer, len);
-
-		return true;
-	}
-
 };
 
 struct MyCompoundSort
@@ -599,10 +741,8 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 
 	NBT_Type::Compound cpdNBTData{};
-	size_t szInputStreamSize = 0;//优化用
 	{
 		JNIInputStream nbtInputStream{ env, nbtData };
-		szInputStreamSize = nbtInputStream.Size();
 		std::string strErrMsg{};
 		if (!NBT_Reader::ReadNBT(nbtInputStream, cpdNBTData, 512, NBT_Print2String{ strErrMsg }))
 		{
@@ -730,7 +870,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 
 
 	// 创建输出流
-	JNIOutputStream outputStream(szInputStreamSize);
+	JNIOutputStream outputStream(JNIDirectBufferOutputStream{ env, nbtData });
 	if (bUseMySortOutput)
 	{
 		std::string strErrMsg{};
@@ -749,7 +889,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_dev_shun_litematica_extra_Schematic
 		}
 	}
 
-	if (outputStream.TryWriteToDirectByteBuffer(env, nbtData))
+	if (outputStream.IsUseDirect())
 	{
 		// 返回空，从nbtData中获取结果
 		return nullptr;
