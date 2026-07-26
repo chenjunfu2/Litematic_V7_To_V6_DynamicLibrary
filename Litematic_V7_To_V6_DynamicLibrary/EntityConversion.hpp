@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "BaseConversion.hpp"
+#include "EntityMappings.hpp"
 
 void ProcessBlockPosExternal(const NBT_Type::String &strPosPerfix, const NBT_Type::String &strV7TagKey, NBT_Node &nodeV7TagVal, NBT_Type::Compound &cpdV6TagData, const NBT_Type::Int iV7McDataVersion)
 {
@@ -183,6 +184,65 @@ void ProcessEntityDropChances(const NBT_Type::String &strV7TagKey, NBT_Node &nod
 	return;
 }
 
+void ProcessIdMappings(const NBT_Type::String &strV7TagKey, NBT_Node &nodeV7TagVal, NBT_Type::Compound &cpdV6TagData, const NBT_Type::Int iV7McDataVersion)
+{
+	if (!nodeV7TagVal.IsString())
+	{
+		cpdV6TagData.Put(strV7TagKey, std::move(nodeV7TagVal));//"id":nodeV7TagVal
+		return;
+	}
+
+	auto &strEntityId = nodeV7TagVal.GetString();
+	NBT_Type::String strMappedId{};
+
+	static constexpr auto strvMcPrefix = MU8STRV("minecraft:");
+	static constexpr auto strvChestBoatSuffix = MU8STRV("_chest_boat");
+	static constexpr auto strvBoatSuffix = MU8STRV("_boat");
+
+	//处理船映射
+	if (strEntityId.ends_with(strvBoatSuffix) && strEntityId.starts_with(strvMcPrefix))
+	{
+		NBT_Type::String::View strvBoatType = NBT_Type::String::View{ strEntityId };
+		strvBoatType.remove_prefix(strvMcPrefix.size());
+
+		if (strEntityId.ends_with(MU8STR("_chest_boat")))
+		{
+			strvBoatType.remove_suffix(strvChestBoatSuffix.size());
+			strMappedId = MU8STR("minecraft:chest_boat");
+		}
+		else
+		{
+			strvBoatType.remove_suffix(strvBoatSuffix.size());
+			strMappedId = MU8STR("minecraft:boat");
+		}
+
+		//插入"Type":strvBoatType
+		cpdV6TagData.PutString(MU8STR("Type"), strvBoatType);
+
+		//插入映射过的"id":strMappedId
+		cpdV6TagData.PutString(strV7TagKey, std::move(strMappedId));
+
+		return;
+	}
+
+	//处理其它映射
+	if (!EntityIdMap(strEntityId, strMappedId, iV7McDataVersion))
+	{
+		//失败直接移动
+		cpdV6TagData.Put(strV7TagKey, std::move(nodeV7TagVal));//"id":nodeV7TagVal
+		return;
+	}
+	else
+	{
+		//成功使用映射值
+		cpdV6TagData.PutString(strV7TagKey, std::move(strMappedId));//"id":strMappedId
+		return;
+	}
+
+	return;
+}
+
+
 void ProcessEntity(NBT_Type::Compound &cpdV7EntityData, NBT_Type::Compound &cpdV6EntityData, const NBT_Type::Int iV7McDataVersion)
 {
 	using std::placeholders::_1;
@@ -213,6 +273,7 @@ void ProcessEntity(NBT_Type::Compound &cpdV7EntityData, NBT_Type::Compound &cpdV
 		{ MU8STR("HandItems"),			std::bind(DefaultProcess,			MU8STR("HandItems"),	(TagProcessFunc_T)std::bind(ProcessEntityItems, _1, _2, _3, 2),		_1, _2, _3, _4) },
 		{ MU8STR("Inventory"),			std::bind(DefaultProcess,			MU8STR("Inventory"),	(TagProcessFunc_T)std::bind(ProcessEntityItems, _1, _2, _3, 1),		_1, _2, _3, _4) },
 
+		{ MU8STR("id"),					ProcessIdMappings },
 		{ MU8STR("equipment"),			ProcessEntityEquipment },
 		{ MU8STR("drop_chances"),		ProcessEntityDropChances },
 	};
