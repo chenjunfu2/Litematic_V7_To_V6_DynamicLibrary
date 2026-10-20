@@ -370,7 +370,7 @@ void ProcessPatterns(NBT_Node &nodeV7Tag, NBT_Node &nodeV6Tag, const NBT_Type::I
 		auto *pstrColor = cpdV7Entry.HasString(MU8STR("color"));
 		if (pstrColor != NULL)
 		{
-			iColor = BannerColorMap(*pstrColor);
+			iColor = DyeColorMap(*pstrColor);
 		}
 		cpdV6Entry.PutInt(MU8STR("Color"), iColor);//插入
 
@@ -490,7 +490,7 @@ void ProcessSkullProfile(NBT_Node &nodeV7Tag, NBT_Node &nodeV6Tag, const NBT_Typ
 
 		for (auto &itTexture : *pTextures)
 		{
-			if (itTexture.IsString())
+			if (!itTexture.IsString())
 			{
 				continue;
 			}
